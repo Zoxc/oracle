@@ -1,0 +1,11 @@
+[package]
+name = "oracle"
+version = "0.1.0"
+authors = ["John Kåre Alsaker <john.kare.alsaker@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+warp = { version = "0.2.5", default-features = false, features = ["websocket"] }
+tokio = { version = "0.2", features = ["net", "macros"] }
+socket2 = "0.3.15"
+byteorder = "1.3.4"
