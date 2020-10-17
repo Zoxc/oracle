@@ -1,0 +1,104 @@
+<app>
+    <mwc-top-app-bar>
+        <div slot="title"><i class="material-icons">api</i> Oracle</div>
+    </mwc-top-app-bar>
+
+    <mwc-drawer>
+        <div class="drawer-content">
+            <mwc-list activatable>
+                <a href="/">
+                    <mwc-list-item graphic="icon">
+                        <span>Overview</span>
+                        <span slot="graphic" class="material-icons inverted">device_hub</span>
+                    </mwc-list-item>
+                </a>
+                <a href="/map">
+                    <mwc-list-item graphic="icon">
+                        <span>Map</span>
+                        <span slot="graphic" class="material-icons inverted">device_hub</span>
+                    </mwc-list-item>
+                </a>
+                <a href="/devices">
+                    <mwc-list-item graphic="icon">
+                        <span>Devices</span>
+                        <span slot="graphic" class="material-icons inverted">devices</span>
+                    </mwc-list-item>
+                </a>
+                <li divider role="separator"></li>
+                <a href="/discover">
+                    <mwc-list-item graphic="icon">
+                        <span>Discover</span>
+                        <span slot="graphic" class="material-icons inverted">search</span>
+                    </mwc-list-item>
+                </a>
+                <li divider role="separator"></li>
+
+                <a href="/settings">
+                    <mwc-list-item graphic="icon">
+                        <span>Settings</span>
+                        <span slot="graphic" class="material-icons inverted">settings</span>
+                    </mwc-list-item>
+                </a>
+            </mwc-list>
+        </div>
+        <div slot="appContent">
+            <router>
+                <route path="/devices">
+                    Home page
+                </route>
+                <route path="/settings">
+                    <settings></settings>
+                </route>
+            </router>
+        </div>
+    </mwc-drawer>
+
+    <script>
+        // type="module"
+        // Note this import is a bare module specifier, so it must be converted
+        // to a path using a server such as es-dev-server.
+        import '@material/mwc-button';
+        import '@material/mwc-drawer';
+        import '@material/mwc-top-app-bar';
+        import '@material/mwc-list';
+        import '@material/mwc-list/mwc-list-item';
+
+
+        import { Router, Route, route, toRegexp, match } from '@riotjs/route'
+
+        export default {
+            components: { Router, Route },
+            onMounted() {
+            }
+        }
+        /*
+        export default {
+            components: {
+                Router,
+                Route,
+            },
+        state: {
+            pages,
+                showNotFound: false,
+                    activePage: null
+        },
+        onBeforeMount({ isServer }) {
+            // create a stream on all routes to catch the not-found page
+            this.anyRouteStream = route('(.*)')
+            this.anyRouteStream.on.value(this.onAnyRoute)
+        },
+        onAnyRoute(path) {
+            // show the not found page if none of the page paths are matched
+            const activePage = pages.find(p => match(path.pathname, toRegexp(p.path)))
+
+            this.update({
+                activePage,
+                showNotFound: !activePage
+            })
+        },
+        onBeforeUnmout() {
+            this.anyRouteStream.end()
+        }
+        }*/
+    </script>
+</app>

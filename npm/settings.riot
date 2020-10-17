@@ -1,0 +1,46 @@
+<settings>
+    <div if={ !state.loaded }>
+        <mwc-circular-progress indeterminate></mwc-circular-progress>
+    </div>
+    <div if={ state.loaded }>
+        <p>
+            <mwc-formfield alignEnd label="Webserver port:">
+                <mwc-textfield label="5050" name="port"></mwc-textfield>
+            </mwc-formfield>
+        </p>
+        <p>
+            <mwc-formfield alignEnd label="Ping interval (seconds):">
+                <mwc-textfield label="30" name="ping"></mwc-textfield>
+            </mwc-formfield>
+        </p>
+
+        <p>
+            <mwc-formfield label="Enable MNDP">
+                <mwc-checkbox></mwc-checkbox>
+            </mwc-formfield>
+        </p>
+
+        <p>
+            <mwc-button outlined label="Cancel"></mwc-button>
+            <mwc-button raised label="Apply"></mwc-button>
+        </p>
+    </div>
+
+    <script>
+        import '@material/mwc-button';
+        import '@material/mwc-checkbox';
+        import '@material/mwc-formfield';
+        import '@material/mwc-textfield';
+        import '@material/mwc-circular-progress';
+
+        export default {
+            state: {
+                loaded: false,
+            },
+            onMounted(props, state) {
+                fetch("/api/settings").then(response => response.json())
+                    .then(data => { this.update({ loaded: true }) })
+            },
+        }
+    </script>
+</settings>
