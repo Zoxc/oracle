@@ -4,27 +4,21 @@
     <ul nz-menu nzMode="inline">
       <li nz-menu-item>
         <i nz-icon nzType="user"></i>
-        <a routerLink="/welcome">Welcome</a>
+        <a routerLink="/map">Map</a>
       </li>
       <li nz-menu-item>
-        <i nz-icon nzType="video-camera"></i>
+        <i nz-icon nzType="hdd"></i>
         <a routerLink="/devices">Devices</a>
       </li>
       <li nz-menu-item>
-        <i nz-icon nzType="upload"></i>
-        <span>nav 3</span>
-      </li>
-      <li nz-menu-item>
-        <i nz-icon nzType="user"></i>
-        <span>nav 4</span>
+        <i nz-icon nzType="setting"></i>
+        <a routerLink="/settings">Settings</a>
       </li>
     </ul>
   </nz-sider>
   <nz-layout>
     <nz-content>
-      <div class="inner-content">
         <router-outlet></router-outlet>
-      </div>
     </nz-content>
   </nz-layout>
 </nz-layout>
