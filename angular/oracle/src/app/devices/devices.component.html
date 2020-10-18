@@ -1,0 +1,27 @@
+<div nz-row>
+    <div nz-col nzSpan="12">
+        <h2>Devices</h2>
+    </div>
+    <div nz-col nzSpan="12" style="text-align:right"><button nz-button nzType="default">Add device</button></div>
+</div>
+<nz-table #basicTable [nzData]="list">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Address</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let data of basicTable.data">
+            <td>{{data.name}}</td>
+            <td>{{data.age}}</td>
+            <td>{{data.address}}</td>
+            <td>
+                <a>Action 一 {{data.name}}</a>
+                <a>Delete</a>
+            </td>
+        </tr>
+    </tbody>
+</nz-table>
