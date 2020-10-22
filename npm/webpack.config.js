@@ -19,6 +19,12 @@ module.exports = {
     open: true,
     historyApiFallback: {
       index: 'index.html'
+    }, proxy: {
+      '/api/**': {
+        target: 'http://localhost:3030',
+        secure: false,
+        //changeOrigin : true
+      }
     }
   },
   optimization: {

@@ -1,6 +1,8 @@
 mod ping;
+mod state;
 mod webserver;
 
 fn main() {
-    webserver::webserver();
+    let state = state::load();
+    webserver::webserver(&state);
 }

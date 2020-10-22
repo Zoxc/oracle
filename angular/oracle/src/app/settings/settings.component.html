@@ -1,15 +1,23 @@
-<div id="content"><h2><i nz-icon nzType="setting"></i> Settings</h2>
-<form nz-form>
-    <nz-form-item>
-        <nz-form-label nzFor="name">Name</nz-form-label>
-        <nz-form-control nzErrorTip="Please input name!">
-            <input nz-input id="name" placeholder="" />
-        </nz-form-control>
-    </nz-form-item>
-    <nz-form-item>
-        <nz-form-label nzFor="name">IPv4</nz-form-label>
-        <nz-form-control nzErrorTip="Please input name!">
-            <input nz-input id="ipv4" placeholder="" />
-        </nz-form-control>
-    </nz-form-item>
-</form></div>
+<div id="content" *ngIf="loaded">
+    <h2><i nz-icon nzType="setting"></i> Settings</h2>
+    <form nz-form [formGroup]="form" (ngSubmit)="apply()">
+        <nz-form-item>
+            <nz-form-label nzFor="web_port">Webserver port</nz-form-label>
+            <nz-form-control nzErrorTip="Please a webserver port!">
+                <input nz-input id="web_port" formControlName="web_port" placeholder="">
+            </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+            <nz-form-label nzFor="ping_interval">Ping interval</nz-form-label>
+            <nz-form-control nzErrorTip="Please input name!">
+                <input nz-input id="ping_interval" formControlName="ping_interval" placeholder="">
+            </nz-form-control>
+        </nz-form-item>
+        <nz-form-item nz-row>
+            <nz-form-control [nzSpan]="14" [nzOffset]="6">
+                <button nz-button nzType="primary" (click)="form.reset(initial)">Reset</button>&nbsp;
+                <button nz-button nzType="primary" [disabled]="!form.valid || form.pristine">Apply</button>
+            </nz-form-control>
+        </nz-form-item>
+    </form>
+</div>

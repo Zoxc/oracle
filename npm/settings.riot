@@ -2,15 +2,17 @@
     <div if={ !state.loaded }>
         <mwc-circular-progress indeterminate></mwc-circular-progress>
     </div>
-    <div if={ state.loaded }>
+    <div if={ state.loaded }><input type="text" id="ping_interval" value="test">
         <p>
             <mwc-formfield alignEnd label="Webserver port:">
-                <mwc-textfield label="5050" name="port"></mwc-textfield>
+                <mwc-textfield label="HTTP" id="web_port" value={state.config.web_port}></mwc-textfield>
             </mwc-formfield>
         </p>
         <p>
-            <mwc-formfield alignEnd label="Ping interval (seconds):">
-                <mwc-textfield label="30" name="ping"></mwc-textfield>
+            <mwc-formfield alignEnd label="Ping interval:">
+                <!--<mwc-textfield label="Seconds" pattern="[0-9]" id="ping_interval" value="{state.config.ping_interval}"
+                    min="1">
+                </mwc-textfield>-->
             </mwc-formfield>
         </p>
 
@@ -21,10 +23,16 @@
         </p>
 
         <p>
-            <mwc-button outlined label="Cancel"></mwc-button>
-            <mwc-button raised label="Apply"></mwc-button>
+            <mwc-button outlined label="Reset" onclick={clear}></mwc-button>&nbsp;
+            <mwc-button raised label="Apply" onclick={submit}></mwc-button>
         </p>
     </div>
+
+    <style>
+        input:invalid {
+            color: red;
+        }
+    </style>
 
     <script>
         import '@material/mwc-button';
@@ -34,12 +42,36 @@
         import '@material/mwc-circular-progress';
 
         export default {
+            clear() {
+                fetch("/api/settings").then(response => response.json())
+                    .then(data => { this.update({ loaded: true, config: data }) })
+            },
+            submit() {
+                let settings = ["web_port", "ping_interval"]
+
+                let values = {};
+                settings.forEach(setting => values[setting] = document.querySelector("#" + setting).value)
+
+                fetch("/api/settings", {
+                    method: "POST", body: JSON.stringify(values), headers: {
+                        "Content-Type": "application/json"
+                    },
+                }).then(response => response.json()).then(errors => {
+                    console.log("errors", errors)
+                    errors.forEach(setting => {
+                        document.querySelector("#" + setting).setCustomValidity("Invalid")
+                        document.querySelector("#" + setting).checkValidity()
+                        document.querySelector("#" + setting).value = document.querySelector("#" + setting).value + "0"
+                        document.querySelector("#" + setting).layout()
+                    })
+                    this.update({});
+                })
+            },
             state: {
                 loaded: false,
             },
             onMounted(props, state) {
-                fetch("/api/settings").then(response => response.json())
-                    .then(data => { this.update({ loaded: true }) })
+                this.clear()
             },
         }
     </script>

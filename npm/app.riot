@@ -44,7 +44,7 @@
         <div slot="appContent">
             <router>
                 <route path="/devices">
-                    Home page
+                    <devices></devices>
                 </route>
                 <route path="/settings">
                     <settings></settings>
@@ -52,6 +52,12 @@
             </router>
         </div>
     </mwc-drawer>
+
+    <style>
+    .drawer-content a {
+        text-decoration: none;
+    }
+    </style>
 
     <script>
         // type="module"
