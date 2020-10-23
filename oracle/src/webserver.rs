@@ -53,22 +53,42 @@ fn devices(state: &State) -> BoxedFilter<(impl Reply,)> {
         .and(warp::post())
         .and(warp::path::end())
         .and(warp::body::json())
-        .map(move |config: HashMap<String, String>| {
-            let ipv4 = from_map(&config, "ipv4");
+        .map(move |mut device: Device| {
+            //let ipv4 = from_map(&config, "ipv4");
 
-            println!("ip: {:?}", ipv4);
+            println!("device: {:?}", device);
 
-            ipv4.map(|ipv4| {
-                let mut state = state_.lock();
-                let id = state.devices.len().try_into().unwrap();
-                state.devices.push(Device { id, ipv4 });
-                state.save_devices();
-            });
+            let mut state = state_.lock();
+            device.id = state.new_device_id();
+            state.devices.push(device);
+            state.save_devices();
 
             ""
         });
 
-    devices.or(add).boxed()
+    let state_ = state.clone();
+    let remove = warp::path!("device" / u32)
+        .and(warp::delete())
+        .map(move |mut device: u32| {
+            //let ipv4 = from_map(&config, "ipv4");
+
+            println!("device: {:?}", device);
+
+            let mut state = state_.lock();
+
+            let index = state
+                .devices
+                .iter()
+                .enumerate()
+                .find(|d| d.1.id == device)
+                .map(|d| d.0);
+            index.map(|i| state.devices.remove(i));
+            state.save_devices();
+
+            ""
+        });
+
+    devices.or(add).or(remove).boxed()
 }
 
 pub fn webserver(state: &State) {

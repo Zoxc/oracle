@@ -3,7 +3,7 @@
         <div nz-col nzSpan="12">
             <h2><i nz-icon nzType="hdd"></i> Devices</h2>
         </div>
-        <div nz-col nzSpan="12" style="text-align:right"><button nz-button nzType="default" (click)="add()">Add
+        <div nz-col nzSpan="12" style="text-align:right"><button nz-button nzType="default" (click)="add_device()">Add
                 device</button></div>
     </div>
     <nz-table #basicTable [nzData]="list">
@@ -19,26 +19,9 @@
                 <td>{{data.name}}</td>
                 <td>{{data.ipv4}}</td>
                 <td>
-                    <a>Delete</a>
+                    <a (click)="delete(data.id)">Delete</a>
                 </td>
             </tr>
         </tbody>
     </nz-table>
-
-    <nz-modal [(nzVisible)]="showAdd" nzTitle="Add device" (nzOnCancel)="close()" (nzOnOk)="add()">
-        <form nz-form>
-            <nz-form-item>
-                <nz-form-label nzFor="name">Name</nz-form-label>
-                <nz-form-control nzErrorTip="Please input name!">
-                    <input nz-input id="name" placeholder="" />
-                </nz-form-control>
-            </nz-form-item>
-            <nz-form-item>
-                <nz-form-label nzFor="ipv4">IPv4</nz-form-label>
-                <nz-form-control nzErrorTip="Please input name!">
-                    <input nz-input id="ipv4" placeholder="" />
-                </nz-form-control>
-            </nz-form-item>
-        </form>
-    </nz-modal>
 </div>

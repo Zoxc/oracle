@@ -2,6 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators, ValidatorFn } from '@angular/forms';
 
 function tcp_port_validator(control: FormControl) {
+  if (isNaN(Number(control.value))) {
+    return {"test": "hm"};
+  }
+
   let number = parseInt(control.value, 10);
 
   if (!isNaN(number) && number > 0 && number < 65536) {
@@ -39,12 +43,12 @@ export class SettingsComponent implements OnInit {
     let data = this.form.value;
     data.web_port = parseInt(data.web_port);
     data.ping_interval = parseInt(data.ping_interval);
+    this.form.reset(data);
     fetch("/api/settings", {
       method: "POST", body: JSON.stringify(data), headers: {
         "Content-Type": "application/json"
       },
-    }).then(response => response.json()).then(data => {
-
+    }).then(response => {
     })
   }
 }

@@ -1,4 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewContainerRef } from '@angular/core';
+import { AddDeviceComponent } from './../add-device/add-device.component';
+import { NzModalRef, NzModalService } from 'ng-zorro-antd/modal';
 
 @Component({
   selector: 'app-devices',
@@ -17,13 +19,48 @@ export class DevicesComponent implements OnInit {
     this.showAdd = false;
   }
 
-  constructor() { }
+  constructor(private modal: NzModalService, private viewContainerRef: ViewContainerRef) { }
 
-  ngOnInit(): void {
+  add_device(): void {
+    const modal = this.modal.create({
+      nzTitle: 'Add device',
+      nzContent: AddDeviceComponent,
+      nzViewContainerRef: this.viewContainerRef,
+      nzComponentParams: {},
+      nzOnOk: () => new Promise(resolve => setTimeout(resolve, 1000)),
+      nzMaskClosable: false,
+    });
+    const instance = modal.getContentComponent();
+    modal.afterClose.subscribe(result => {
+      console.log('[afterClose] The result is:', result); if (result) { this.update() }
+    });
+  }
+
+  delete(id) {
+    let device = this.list.find(device => device.id === id)
+
+    this.modal.confirm({
+      nzTitle: `Do you want to delete ${device.name || device.ipv4}?`,
+      nzOnOk: () => {
+
+        fetch(`/api/device/${device.id}`, {
+          method: "DELETE",
+        }).then(errors => {
+          this.update()
+        })
+      }
+    });
+  }
+
+  update(): void {
     fetch("/api/devices").then(response => response.json())
       .then(data => {
         this.list = data;
       })
   }
 
+  ngOnInit(): void {
+    this.update()
+  }
 }
+
