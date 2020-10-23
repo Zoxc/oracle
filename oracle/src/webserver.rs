@@ -1,8 +1,12 @@
+use crate::monitor::SubscribeResponse;
 use crate::state::{Configuration, Device, State};
+use futures::{FutureExt, SinkExt, StreamExt};
 use serde_json;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::str;
+use tokio::sync::{broadcast, mpsc, oneshot};
+use warp::ws;
 use warp::{filters::BoxedFilter, Filter, Reply};
 
 fn from_map<T: str::FromStr>(map: &HashMap<String, String>, field: &str) -> Option<T> {
@@ -38,7 +42,10 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
     read_settings.or(write_settings).boxed()
 }
 
-fn devices(state: &State) -> BoxedFilter<(impl Reply,)> {
+fn devices(
+    state: &State,
+    subscribe: mpsc::Sender<oneshot::Sender<SubscribeResponse>>,
+) -> BoxedFilter<(impl Reply,)> {
     let state_ = state.clone();
     let devices = warp::path("devices")
         .and(warp::get())
@@ -69,11 +76,7 @@ fn devices(state: &State) -> BoxedFilter<(impl Reply,)> {
     let state_ = state.clone();
     let remove = warp::path!("device" / u32)
         .and(warp::delete())
-        .map(move |mut device: u32| {
-            //let ipv4 = from_map(&config, "ipv4");
-
-            println!("device: {:?}", device);
-
+        .map(move |device: u32| {
             let mut state = state_.lock();
 
             let index = state
@@ -88,29 +91,63 @@ fn devices(state: &State) -> BoxedFilter<(impl Reply,)> {
             ""
         });
 
-    devices.or(add).or(remove).boxed()
+    let status = warp::path!("devices" / "status")
+        .and(warp::ws())
+        .map(move |ws: ws::Ws| {
+            println!("websocket!");
+            let mut subscribe = subscribe.clone();
+            ws.on_upgrade(|websocket| async move {
+                let mut response = {
+                    let (tx, rx) = oneshot::channel();
+                    subscribe.send(tx).await.ok();
+                    rx.await.unwrap()
+                };
+
+                let (mut tx, mut rx) = websocket.split();
+
+                tx.send(ws::Message::text(
+                    serde_json::to_string(&response.current).unwrap(),
+                ))
+                .await
+                .ok(); // May fail due to the websocket closing
+
+                loop {
+                    tokio::select! {
+                        Some(Ok(msg)) = rx.next() => {
+                            if msg.is_close() {
+                                break
+                            }
+                        },
+                        Ok(msg) = response.receiver.recv() => {
+                            tx.send(ws::Message::text(
+                                serde_json::to_string(&[msg]).unwrap(),
+                            )).await.ok(); // May fail due to the websocket closing
+                        },
+                        else => {
+                            break
+                        }
+                    };
+                }
+            })
+        });
+
+    devices.or(add).or(remove).or(status).boxed()
 }
 
-pub fn webserver(state: &State) {
+pub async fn webserver(
+    state: &State,
+    mut subscribe: mpsc::Sender<oneshot::Sender<SubscribeResponse>>,
+) {
     let port = state.lock().config.web_port;
 
-    let files = warp::path("static").and(warp::fs::dir("web"));
+    let files = warp::fs::dir("web");
     let index = warp::fs::file("web/index.html");
 
     let app = files
         .or(index)
         .map(|reply| warp::reply::with_header(reply, "Cache-Control", "no-cache"));
 
-    let api = warp::path("api").and(settings(state).or(devices(state)));
+    let api = warp::path("api").and(settings(state).or(devices(state, subscribe)));
 
-    let server = async move {
-        warp::serve(api.or(app)).run(([127, 0, 0, 1], port)).await;
-    };
-
-    tokio::runtime::Builder::new()
-        .basic_scheduler()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(server);
+    warp::serve(api.or(app)).run(([127, 0, 0, 1], port)).await;
 }

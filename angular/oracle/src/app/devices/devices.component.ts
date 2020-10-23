@@ -10,6 +10,8 @@ import { NzModalRef, NzModalService } from 'ng-zorro-antd/modal';
 export class DevicesComponent implements OnInit {
   list = [];
   showAdd = false;
+  ws: WebSocket
+  status: any = {}
 
   add() {
     this.showAdd = true;
@@ -61,6 +63,34 @@ export class DevicesComponent implements OnInit {
 
   ngOnInit(): void {
     this.update()
+
+    console.log(`ws://${window.location.host}/api/devices/status`)
+
+    this.ws = new WebSocket(`ws://${window.location.host}/api/devices/status`)
+    this.ws.onmessage = event => {
+      let events = JSON.parse(event.data);
+
+      for (let event of events) {
+        console.log(event)
+        this.status[event.id] = event.status
+      }
+      
+    };
+    this.ws.onopen = ev => {
+      console.log("wsopen")
+    }
+    this.ws.onclose = ev => {
+      console.log("wsclose", ev)
+    }
+    this.ws.onerror = ev => {
+      console.log("wserror", ev)
+    }
+    console.log("wscreate")
+
+  }
+
+  ngOnDestroy() {
+    this.ws.close()
   }
 }
 

@@ -5,6 +5,8 @@ use std::fs;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
+pub type DeviceId = u32;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Configuration {
     pub web_port: u16,
@@ -19,7 +21,7 @@ impl Configuration {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
-    pub id: u32,
+    pub id: DeviceId,
     pub name: Option<String>,
     pub ipv4: Option<Ipv4Addr>,
 }
@@ -30,7 +32,7 @@ pub struct StateFields {
 }
 
 impl StateFields {
-    pub fn new_device_id(&self) -> u32 {
+    pub fn new_device_id(&self) -> DeviceId {
         for i in 0..=(u32::MAX) {
             if self.devices.iter().find(|d| d.id == i).is_none() {
                 return i;
