@@ -1,20 +1,11 @@
-use crate::monitor::DeviceUpdate;
-use crate::monitor::SubscribeResponse;
-use crate::state::{Configuration, Device, DeviceId, State};
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fs;
-use std::net::Ipv4Addr;
 use std::str;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::spawn;
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::time::{delay_for, Duration};
+use tokio::sync::broadcast;
 use warp::ws;
 use warp::{filters::BoxedFilter, Filter, Reply};
 
@@ -25,7 +16,7 @@ pub struct Entry {
     pub time: SystemTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum Kind {
     Note,
     Error,
@@ -44,10 +35,10 @@ impl Log {
         }
     }
 
-    pub fn note(&self, val: &str) {
+    pub fn log(&self, kind: Kind, msg: &str) {
         let entry = Entry {
-            kind: Kind::Note,
-            msg: val.into(),
+            kind,
+            msg: msg.into(),
             time: SystemTime::now(),
         };
         let mut entries = self.entries.lock();
@@ -56,21 +47,25 @@ impl Log {
             entries.remove(0);
         }
         self.sender.send(entry).ok();
-        eprintln!("[Note]: {}", val);
+        eprintln!("[{:?}]: {}", kind, msg);
+    }
+
+    pub fn note(&self, val: &str) {
+        self.log(Kind::Note, val);
     }
 }
 
 pub fn websocket(log: Arc<Log>) -> BoxedFilter<(impl Reply,)> {
     warp::ws()
         .map(move |ws: ws::Ws| {
-            let log = log.clone();
-            ws.on_upgrade(|websocket| async move {
-                let (entries, mut receiver) = {
-                    let entries = log.entries.lock();
-                    let entries = entries.clone();
-                    (entries, log.sender.subscribe())
-                };
+            let (entries, mut receiver) = {
+                let log = &log;
+                let entries = log.entries.lock();
+                let entries = entries.clone();
+                (entries, log.sender.subscribe())
+            };
 
+            ws.on_upgrade(|websocket| async move {
                 let (mut tx, mut rx) = websocket.split();
 
                 tx.send(ws::Message::text(serde_json::to_string(&entries).unwrap()))

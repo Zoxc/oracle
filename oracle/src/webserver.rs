@@ -1,19 +1,13 @@
 use crate::log::{self, Log};
 use crate::monitor::SubscribeResponse;
 use crate::state::{Configuration, Device, State};
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use serde_json;
-use std::collections::HashMap;
-use std::convert::TryInto;
 use std::str;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 use warp::ws;
 use warp::{filters::BoxedFilter, Filter, Reply};
-
-fn from_map<T: str::FromStr>(map: &HashMap<String, String>, field: &str) -> Option<T> {
-    map.get(field).and_then(|data| str::parse(data.trim()).ok())
-}
 
 fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
     let state_ = state.clone();
@@ -81,12 +75,7 @@ fn devices(
         .map(move |device: u32| {
             let mut state = state_.lock();
 
-            let index = state
-                .devices
-                .iter()
-                .enumerate()
-                .find(|d| d.1.id == device)
-                .map(|d| d.0);
+            let index = state.device_index(device);
             index.map(|i| state.devices.remove(i));
             state.save_devices();
 

@@ -1,16 +1,11 @@
+use crate::log::Kind;
 use crate::log::Log;
+use crate::monitor::DeviceStatus;
 use crate::monitor::DeviceUpdate;
-use crate::state::{Configuration, Device, DeviceId, State};
-use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
-use serde_json;
-use std::collections::HashMap;
-use std::fs;
-use std::net::Ipv4Addr;
+use crate::state::State;
 use std::sync::Arc;
-use std::time::SystemTime;
 use tokio::spawn;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
 
 pub async fn notifier(state: State, log: Arc<Log>, mut receiver: mpsc::Receiver<DeviceUpdate>) {
@@ -21,6 +16,14 @@ pub async fn notifier(state: State, log: Arc<Log>, mut receiver: mpsc::Receiver<
     loop {
         tokio::select! {
             Some(msg) = receiver.recv() => {
+                let desc = state.lock().device(msg.id).desc();
+
+                match msg.status {
+                    DeviceStatus::Up => log.log(Kind::Note, &format!("Device {} is up", desc)),
+                    DeviceStatus::Down => log.log(Kind::Error, &format!("Device {} is down", desc)),
+                    _ => (),
+                }
+
                 buffer.push(msg);
 
                 if !active {

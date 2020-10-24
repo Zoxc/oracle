@@ -12,6 +12,8 @@
             <tr *ngFor="let entry of deviceTable.data">
                 <td>
                     <i *ngIf="entry.kind === 'Note'" nz-icon nzType="info-circle" nzTheme="outline"></i>
+                    <i *ngIf="entry.kind === 'Error'" nz-icon nzType="warning" nzTheme="fill"
+                        style="color: indianred;"></i>
                     &nbsp;
                     {{entry.msg}}
                 </td>

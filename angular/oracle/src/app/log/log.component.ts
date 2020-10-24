@@ -18,7 +18,7 @@ export class LogComponent implements OnInit {
       let events = JSON.parse(event.data);
       for (let event of events) {
         console.log(event)
-        this.log.splice(0, 0, event);
+        this.log = [event].concat(this.log);
       }
 
     };

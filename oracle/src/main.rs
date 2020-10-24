@@ -27,6 +27,6 @@ fn main() {
             let monitor = spawn(monitor::main_monitor(state.clone(), rx, notify_tx));
             let web_server = spawn(webserver::webserver(state.clone(), tx, log.clone()));
             log.note("Server started up");
-            tokio::join!(notifier, monitor, web_server);
+            let _ = tokio::join!(notifier, monitor, web_server);
         });
 }

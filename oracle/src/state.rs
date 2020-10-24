@@ -26,6 +26,18 @@ pub struct Device {
     pub ipv4: Option<Ipv4Addr>,
 }
 
+impl Device {
+    pub fn desc(&self) -> String {
+        if let Some(name) = &self.name {
+            name.clone()
+        } else if let Some(ipv4) = self.ipv4 {
+            ipv4.to_string()
+        } else {
+            format!("<device #{}>", self.id)
+        }
+    }
+}
+
 pub struct StateFields {
     pub config: Configuration,
     pub devices: Vec<Device>,
@@ -55,6 +67,18 @@ impl StateFields {
             serde_json::to_string_pretty(&self.devices).unwrap(),
         )
         .unwrap()
+    }
+
+    pub fn device_index(&self, id: DeviceId) -> Option<usize> {
+        self.devices
+            .iter()
+            .enumerate()
+            .find(|d| d.1.id == id)
+            .map(|d| d.0)
+    }
+
+    pub fn device(&self, id: DeviceId) -> &Device {
+        &self.devices[self.device_index(id).unwrap()]
     }
 }
 
