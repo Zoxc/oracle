@@ -10,10 +10,12 @@ import { FormBuilder, FormControl, FormGroup, Validators, ValidatorFn } from '@a
 export class AddDeviceComponent implements OnInit {
   form = new FormGroup({
     "name": new FormControl(""),
-    "ipv4": new FormControl("")
+    "ipv4": new FormControl(""),
+    "snmp": new FormControl(true),
+    "snmp_community": new FormControl("")
   });
 
-  constructor(private modal: NzModalRef) {}
+  constructor(private modal: NzModalRef) { }
 
   ngOnInit(): void {
   }
@@ -30,10 +32,12 @@ export class AddDeviceComponent implements OnInit {
     }
     data.id = 0;
 
+    console.log(data);
+
     fetch("/api/device", {
-        method: "POST", body: JSON.stringify(data), headers: {
-            "Content-Type": "application/json"
-        },
+      method: "POST", body: JSON.stringify(data), headers: {
+        "Content-Type": "application/json"
+      },
     }).then(errors => {
       this.modal.destroy(true);
     })

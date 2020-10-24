@@ -1,14 +1,19 @@
+use crate::devices::Devices;
 use crate::log::Kind;
 use crate::log::Log;
 use crate::monitor::DeviceStatus;
 use crate::monitor::DeviceUpdate;
-use crate::state::State;
+use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::spawn;
 use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
 
-pub async fn notifier(state: State, log: Arc<Log>, mut receiver: mpsc::Receiver<DeviceUpdate>) {
+pub async fn notifier(
+    devices: Arc<Mutex<Devices>>,
+    log: Arc<Log>,
+    mut receiver: mpsc::Receiver<DeviceUpdate>,
+) {
     let mut buffer = Vec::new();
     let mut active = false;
     let (send_email_signal, mut email_signal) = mpsc::channel(10);
@@ -16,7 +21,7 @@ pub async fn notifier(state: State, log: Arc<Log>, mut receiver: mpsc::Receiver<
     loop {
         tokio::select! {
             Some(msg) = receiver.recv() => {
-                let desc = state.lock().device(msg.id).desc();
+                let desc = devices.lock().device(msg.id).desc();
 
                 match msg.status {
                     DeviceStatus::Up => log.log(Kind::Note, &format!("Device {} is up", desc)),

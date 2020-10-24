@@ -13,6 +13,8 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
+import { NzRadioModule } from 'ng-zorro-antd/radio';
+import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
@@ -50,6 +52,8 @@ registerLocaleData(en);
     NzModalModule,
     NzFormModule,
     NzToolTipModule,
+    NzRadioModule,
+    NzCheckboxModule,
     FormsModule,
     ReactiveFormsModule,
     HttpClientModule

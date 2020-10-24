@@ -2,7 +2,6 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs;
-use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 pub type DeviceId = u32;
@@ -17,75 +16,18 @@ impl Configuration {
     pub fn load() -> Configuration {
         serde_json::from_str(&fs::read_to_string("data/config.json").unwrap()).unwrap()
     }
-}
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Device {
-    pub id: DeviceId,
-    pub name: Option<String>,
-    pub ipv4: Option<Ipv4Addr>,
-}
-
-impl Device {
-    pub fn desc(&self) -> String {
-        if let Some(name) = &self.name {
-            name.clone()
-        } else if let Some(ipv4) = self.ipv4 {
-            ipv4.to_string()
-        } else {
-            format!("<device #{}>", self.id)
-        }
-    }
-}
-
-pub struct StateFields {
-    pub config: Configuration,
-    pub devices: Vec<Device>,
-}
-
-impl StateFields {
-    pub fn new_device_id(&self) -> DeviceId {
-        for i in 0..=(u32::MAX) {
-            if self.devices.iter().find(|d| d.id == i).is_none() {
-                return i;
-            }
-        }
-        panic!()
-    }
-
-    pub fn save_config(&self) {
+    pub fn save(&self) {
         fs::write(
             "data/config.json",
-            serde_json::to_string_pretty(&self.config).unwrap(),
+            serde_json::to_string_pretty(&self).unwrap(),
         )
         .unwrap()
-    }
-
-    pub fn save_devices(&self) {
-        fs::write(
-            "data/devices.json",
-            serde_json::to_string_pretty(&self.devices).unwrap(),
-        )
-        .unwrap()
-    }
-
-    pub fn device_index(&self, id: DeviceId) -> Option<usize> {
-        self.devices
-            .iter()
-            .enumerate()
-            .find(|d| d.1.id == id)
-            .map(|d| d.0)
-    }
-
-    pub fn device(&self, id: DeviceId) -> &Device {
-        &self.devices[self.device_index(id).unwrap()]
     }
 }
 
-pub type State = Arc<Mutex<StateFields>>;
+pub type State = Arc<Mutex<Configuration>>;
 
 pub fn load() -> State {
-    let devices = serde_json::from_str(&fs::read_to_string("data/devices.json").unwrap()).unwrap();
-    let config = Configuration::load();
-    Arc::new(Mutex::new(StateFields { config, devices }))
+    Arc::new(Mutex::new(Configuration::load()))
 }

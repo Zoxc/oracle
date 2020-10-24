@@ -12,9 +12,18 @@
                 <input nz-input id="ipv4" formControlName="ipv4" placeholder="" />
             </nz-form-control>
         </nz-form-item>
+        <nz-form-item>
+            <label nz-checkbox formControlName="snmp">SNMPv2</label>
+        </nz-form-item>
+        <nz-form-item *ngIf="form.value.snmp">
+            <nz-form-label nzFor="snmp_community">SNMP Community</nz-form-label>
+            <nz-form-control nzErrorTip="Please input name!">
+                <input nz-input id="snmp_community" formControlName="snmp_community">
+            </nz-form-control>
+        </nz-form-item>
     </form>
-  </div>
-  <div *nzModalFooter>
+</div>
+<div *nzModalFooter>
     <button nz-button nzType="default" (click)="cancel()">Cancel</button>
     <button nz-button nzType="primary" (click)="add()" [disabled]="!form.valid || form.pristine">Add</button>
-  </div>
+</div>

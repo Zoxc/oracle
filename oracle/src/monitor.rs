@@ -1,10 +1,13 @@
+use crate::devices::{DeviceChange, Devices};
 use crate::ping::Ping;
-use crate::state::{DeviceId, State};
+use crate::state::DeviceId;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::net::Ipv4Addr;
+use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::{broadcast, mpsc, oneshot, Notify};
+use std::{collections::HashMap, sync::atomic::AtomicBool};
+use std::{net::Ipv4Addr, sync::atomic::Ordering};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{delay_for, timeout, Duration};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
@@ -14,27 +17,22 @@ pub enum DeviceStatus {
     Down,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug)]
 struct DeviceState {
     status: DeviceStatus,
     since: SystemTime,
     ipv4: Ipv4Addr,
+    aborted: Arc<AtomicBool>,
 }
 
 async fn device_monitor(
-    state: State,
+    ip: Ipv4Addr,
     mut ping: Ping,
     mut status: DeviceStatus,
     id: DeviceId,
     mut tx: mpsc::Sender<DeviceUpdate>,
-    mut notify: Notify,
+    aborted: Arc<AtomicBool>,
 ) {
-    let ip = if let Some(ip) = state.lock().device(id).ipv4.clone() {
-        ip
-    } else {
-        return;
-    };
-
     loop {
         let new_status = match timeout(Duration::from_secs(1), ping.ping(ip)).await {
             Ok(_) => DeviceStatus::Up,
@@ -42,7 +40,7 @@ async fn device_monitor(
                 let mut new_status = DeviceStatus::Down;
 
                 // Ping timed out, try 10 times before registering the device as down
-                for _ in 0..9 {
+                for _ in 0..9i32 {
                     delay_for(Duration::from_secs(1)).await;
                     match timeout(Duration::from_secs(1), ping.ping(ip)).await {
                         Ok(_) => {
@@ -57,6 +55,10 @@ async fn device_monitor(
             }
         };
 
+        if aborted.load(Ordering::SeqCst) {
+            break;
+        }
+
         if status != new_status {
             status = new_status;
             tx.send(DeviceUpdate {
@@ -69,6 +71,10 @@ async fn device_monitor(
         }
 
         delay_for(Duration::from_millis(10000)).await;
+
+        if aborted.load(Ordering::SeqCst) {
+            break;
+        }
     }
 }
 
@@ -86,62 +92,91 @@ pub struct SubscribeResponse {
 }
 
 pub async fn main_monitor(
-    state: State,
+    devices: Arc<Mutex<Devices>>,
     mut subscribe_request: mpsc::Receiver<oneshot::Sender<SubscribeResponse>>,
-    mut notify: mpsc::Sender<DeviceUpdate>,
+    mut aborted: mpsc::Sender<DeviceUpdate>,
 ) {
     let ping = Ping::new();
     let start = SystemTime::now();
-    let mut devices: HashMap<DeviceId, DeviceState> = {
-        let state = state.lock();
-        state
-            .devices
+
+    let (tx, mut recv_monitor_msg) = mpsc::channel(1000);
+
+    let (mut state, mut changes): (HashMap<DeviceId, DeviceState>, _) = {
+        let devices = devices.lock();
+        let state = devices
+            .list
             .iter()
             .filter_map(|device| {
                 device.ipv4.map(|ipv4| {
+                    let aborted = Arc::new(AtomicBool::new(false));
+                    tokio::spawn(device_monitor(
+                        ipv4,
+                        ping.clone(),
+                        DeviceStatus::Unknown,
+                        device.id,
+                        tx.clone(),
+                        aborted.clone(),
+                    ));
                     (
                         device.id,
                         DeviceState {
                             status: DeviceStatus::Unknown,
                             since: start,
                             ipv4,
+                            aborted,
                         },
                     )
                 })
             })
-            .collect()
+            .collect();
+        let changes = devices.changes.subscribe();
+        (state, changes)
     };
 
     let (to_subscribers, _) = broadcast::channel(1000);
 
-    let (tx, mut recv_monitor_msg) = mpsc::channel(1000);
-
-    for (&id, device_state) in devices.iter() {
-        tokio::spawn(device_monitor(
-            state.clone(),
-            ping.clone(),
-            device_state.status,
-            id,
-            tx.clone(),
-        ));
-    }
-
     loop {
         tokio::select! {
-            Some(msg) = recv_monitor_msg.recv() => {
-                let mut state = devices.get_mut(&msg.id).unwrap();
-
-                if state.status != DeviceStatus::Unknown {
-                    notify.send(msg.clone()).await.unwrap();
+            Ok(change) = changes.recv() => {
+                match change {
+                    DeviceChange::Added(id) => {
+                        if let Some(ipv4) = devices.lock().device(id).ipv4.clone() {
+                            let aborted = Arc::new(AtomicBool::new(false));
+                            tokio::spawn(device_monitor(
+                                ipv4,
+                                ping.clone(),
+                                DeviceStatus::Unknown,
+                                id,
+                                tx.clone(),
+                                aborted.clone(),
+                            ));
+                            state.insert(id, DeviceState {
+                                status: DeviceStatus::Unknown,
+                                since: SystemTime::now(),
+                                ipv4,
+                                aborted,
+                            });
+                        }
+                    }
+                    DeviceChange::Removed(id) => {
+                        state.remove(&id).unwrap().aborted.store(true, Ordering::SeqCst);
+                    }
                 }
+            },
+            Some(msg) = recv_monitor_msg.recv() => {
+                if let Some(mut state) = state.get_mut(&msg.id) {
+                    if state.status != DeviceStatus::Unknown {
+                        aborted.send(msg.clone()).await.unwrap();
+                    }
 
-                state.status = msg.status;
-                state.since = msg.since;
-                to_subscribers.send(msg).ok(); // May fail due to no subscribers
+                    state.status = msg.status;
+                    state.since = msg.since;
+                    to_subscribers.send(msg).ok(); // May fail due to no subscribers
+                };
             },
             Some(subscribe_request) = subscribe_request.recv() => {
                 subscribe_request.send(SubscribeResponse {
-                    current: devices.iter().map(|(id, state)| DeviceUpdate {
+                    current: state.iter().map(|(id, state)| DeviceUpdate {
                         id: *id,
                         status: state.status,
                         since: state.since,
