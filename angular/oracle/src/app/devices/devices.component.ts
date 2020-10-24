@@ -12,6 +12,7 @@ export class DevicesComponent implements OnInit {
   showAdd = false;
   ws: WebSocket
   status: any = {}
+  start = 0
 
   add() {
     this.showAdd = true;
@@ -19,6 +20,11 @@ export class DevicesComponent implements OnInit {
 
   close() {
     this.showAdd = false;
+  }
+
+  get_status(id) {
+    let state = this.status[id];
+    return state || {state: "Unknown", since: this.start}
   }
 
   constructor(private modal: NzModalService, private viewContainerRef: ViewContainerRef) { }
@@ -72,7 +78,7 @@ export class DevicesComponent implements OnInit {
 
       for (let event of events) {
         console.log(event)
-        this.status[event.id] = event.status
+        this.status[event.id] = {status: event.status, since: event.since.secs_since_epoch}
       }
       
     };

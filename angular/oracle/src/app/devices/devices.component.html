@@ -6,39 +6,46 @@
         <div nz-col nzSpan="12" style="text-align:right"><button nz-button nzType="default" (click)="add_device()">Add
                 device</button></div>
     </div>
-    <nz-table #basicTable [nzData]="list" style="table-layout: fixed;">
+    <nz-table #deviceTable [nzData]="list">
         <thead>
             <tr>
                 <th>Name</th>
                 <th>IPv4</th>
                 <th style="width: 20%;">Status</th>
+                <th style="width: 20%;">Since</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr *ngFor="let data of basicTable.data">
+            <tr *ngFor="let data of deviceTable.data">
                 <td>{{data.name}}</td>
                 <td>{{data.ipv4}}</td>
 
-                <td *ngIf="status[data.id] === 'Up'" style="color: seagreen;">
+                <td *ngIf="get_status(data.id).status == 'Up'" style="color: seagreen;">
                     <i nz-icon nzType="check-circle" nzTheme="fill"></i> Up
                 </td>
-                
-                <td *ngIf="status[data.id] === 'Down'" style="color: indianred;">
+
+                <td *ngIf="get_status(data.id).status === 'Down'" style="color: indianred;">
                     <i nz-icon nzType="warning" nzTheme="fill"></i> Down
                 </td>
-                
-                <td *ngIf="status[data.id] === 'Unknown' || !status[data.id]" style="color: silver;">
+
+                <td *ngIf="get_status(data.id).status === 'Unknown'" style="color: silver;">
                     <i nz-icon nzType="question-circle" nzTheme="fill"></i> Unknown
                 </td>
-                
+
                 <td>
-                    <button nz-tooltip nzTooltipTitle="Information" nzTooltipPlacement="bottom" nz-button nzShape="circle"><i nz-icon nzType="profile"></i></button>
+                    <app-since [since]="get_status(data.id).since"></app-since>
+                </td>
+
+                <td>
+                    <button nz-tooltip nzTooltipTitle="Information" nzTooltipPlacement="bottom" nz-button
+                        nzShape="circle"><i nz-icon nzType="profile"></i></button>
                     &nbsp;
-                    <button nz-tooltip nzTooltipTitle="Edit" nzTooltipPlacement="bottom" nz-button nzShape="circle"><i nz-icon nzType="edit"></i></button>
+                    <button nz-tooltip nzTooltipTitle="Edit" nzTooltipPlacement="bottom" nz-button nzShape="circle"><i
+                            nz-icon nzType="edit"></i></button>
                     &nbsp;
-                    <button (click)="delete(data.id)" nz-tooltip nzTooltipTitle="Delete" nzTooltipPlacement="bottom" nz-button nzShape="circle"><i nz-icon
-                            nzType="delete"></i></button>
+                    <button (click)="delete(data.id)" nz-tooltip nzTooltipTitle="Delete" nzTooltipPlacement="bottom"
+                        nz-button nzShape="circle"><i nz-icon nzType="delete"></i></button>
                 </td>
             </tr>
         </tbody>

@@ -1,6 +1,8 @@
 <nz-layout class="layout">
   <nz-sider class="menu-sidebar" nzTheme="light">
-    <div style="background-color: rgb(0, 21, 41);color:rgba(255, 255, 255, 0.65);display: block;line-height: 60px;padding-left: 24px;"><i nz-icon nzType="radar-chart"></i> Oracle</div>
+    <div
+      style="background-color: rgb(0, 21, 41);color:rgba(255, 255, 255, 0.65);display: block;line-height: 60px;padding-left: 24px;">
+      <i nz-icon nzType="radar-chart"></i> Oracle</div>
     <ul nz-menu nzMode="inline">
       <li nz-menu-item>
         <i nz-icon nzType="apartment"></i>
@@ -14,59 +16,15 @@
         <i nz-icon nzType="setting"></i>
         <a routerLink="/settings">Settings</a>
       </li>
+      <li nz-menu-item>
+        <i nz-icon nzType="info-circle"></i>
+        <a routerLink="/log">Log</a>
+      </li>
     </ul>
   </nz-sider>
   <nz-layout>
     <nz-content>
-        <router-outlet></router-outlet>
+      <router-outlet></router-outlet>
     </nz-content>
   </nz-layout>
 </nz-layout>
-<!--
-<nz-layout class="app-layout">
-  <nz-sider class="menu-sidebar" nzCollapsible nzWidth="256px" nzBreakpoint="md" [(nzCollapsed)]="isCollapsed"
-    [nzTrigger]="null">
-    <div class="sidebar-logo">
-      <h1>Oracle</h1>
-    </div>
-    <ul nz-menu nzMode="inline" [nzInlineCollapsed]="isCollapsed">
-      <li nz-menu-item nzMatchRouter>
-        <a routerLink="/welcome">Welcome</a>
-      </li>
-      <li nz-submenu nzOpen nzTitle="Dashboard" nzIcon="dashboard">
-        <ul>
-          <li nz-menu-item nzMatchRouter>
-            <a routerLink="/welcome">Welcome</a>
-          </li>
-          <li nz-menu-item nzMatchRouter>
-            <a>Monitor</a>
-          </li>
-          <li nz-menu-item nzMatchRouter>
-            <a>Workplace</a>
-          </li>
-        </ul>
-      </li>
-      <li nz-submenu nzOpen nzTitle="Form" nzIcon="form">
-        <ul>
-          <li nz-menu-item nzMatchRouter>
-            <a>Basic Form</a>
-          </li>
-        </ul>
-      </li>
-    </ul>
-  </nz-sider>
-  <nz-layout>
-    <nz-header>
-      <div class="app-header">
-        <span class="header-trigger" (click)="isCollapsed = !isCollapsed">
-          <i class="trigger" nz-icon [nzType]="isCollapsed ? 'menu-unfold' : 'menu-fold'"></i>
-        </span>
-      </div>
-    </nz-header>
-    <nz-content>
-      <div class="inner-content">
-        <router-outlet></router-outlet>
-      </div>
-    </nz-content>
-  </nz-layout>
-</nz-layout>-->

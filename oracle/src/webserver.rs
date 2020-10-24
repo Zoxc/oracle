@@ -1,3 +1,4 @@
+use crate::log::{self, Log};
 use crate::monitor::SubscribeResponse;
 use crate::state::{Configuration, Device, State};
 use futures::{FutureExt, SinkExt, StreamExt};
@@ -5,6 +6,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::str;
+use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use warp::ws;
 use warp::{filters::BoxedFilter, Filter, Reply};
@@ -94,7 +96,6 @@ fn devices(
     let status = warp::path!("devices" / "status")
         .and(warp::ws())
         .map(move |ws: ws::Ws| {
-            println!("websocket!");
             let mut subscribe = subscribe.clone();
             ws.on_upgrade(|websocket| async move {
                 let mut response = {
@@ -135,8 +136,9 @@ fn devices(
 }
 
 pub async fn webserver(
-    state: &State,
-    mut subscribe: mpsc::Sender<oneshot::Sender<SubscribeResponse>>,
+    state: State,
+    subscribe: mpsc::Sender<oneshot::Sender<SubscribeResponse>>,
+    log: Arc<Log>,
 ) {
     let port = state.lock().config.web_port;
 
@@ -147,7 +149,11 @@ pub async fn webserver(
         .or(index)
         .map(|reply| warp::reply::with_header(reply, "Cache-Control", "no-cache"));
 
-    let api = warp::path("api").and(settings(state).or(devices(state, subscribe)));
+    let log = warp::path!("log").and(log::websocket(log));
+
+    let api = settings(&state).or(devices(&state, subscribe)).or(log);
+
+    let api = warp::path("api").and(api);
 
     warp::serve(api.or(app)).run(([127, 0, 0, 1], port)).await;
 }

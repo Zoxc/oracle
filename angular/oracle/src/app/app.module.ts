@@ -23,6 +23,8 @@ import en from '@angular/common/locales/en';
 import { DevicesComponent } from './devices/devices.component';
 import { SettingsComponent } from './settings/settings.component';
 import { AddDeviceComponent } from './add-device/add-device.component';
+import { SinceComponent } from './since/since.component';
+import { LogComponent } from './log/log.component';
 
 registerLocaleData(en);
 
@@ -31,7 +33,9 @@ registerLocaleData(en);
     AppComponent,
     DevicesComponent,
     SettingsComponent,
-    AddDeviceComponent
+    AddDeviceComponent,
+    SinceComponent,
+    LogComponent
   ],
   imports: [
     BrowserModule,

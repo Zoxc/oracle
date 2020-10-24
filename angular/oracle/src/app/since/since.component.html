@@ -1,0 +1,2 @@
+<span *ngIf="now > since * 1000" nz-tooltip
+    nzTooltipTitle="{{ since * 1000 | date: 'medium' }}">{{ (now - since * 1000) | date: 'H:mm:ss': 'UTC' }}</span>

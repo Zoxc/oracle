@@ -1,0 +1,22 @@
+<div style="max-width: 1200px; margin-left: auto; margin-right: auto;" *ngIf="loaded">
+    <h2><i nz-icon nzType="info-circle"></i> Log</h2>
+
+    <nz-table #deviceTable [nzData]="log">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th style="width: 20%;">Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor="let entry of deviceTable.data">
+                <td>
+                    <i *ngIf="entry.kind === 'Note'" nz-icon nzType="info-circle" nzTheme="outline"></i>
+                    &nbsp;
+                    {{entry.msg}}
+                </td>
+                <td>{{entry.time.secs_since_epoch * 1000 | date: 'medium' }}</td>
+            </tr>
+        </tbody>
+    </nz-table>
+</div>

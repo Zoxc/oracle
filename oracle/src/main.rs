@@ -1,7 +1,10 @@
+use std::sync::Arc;
 use tokio::spawn;
 use tokio::sync::mpsc;
 
+mod log;
 mod monitor;
+mod notifier;
 mod ping;
 mod state;
 mod webserver;
@@ -15,9 +18,15 @@ fn main() {
         .build()
         .unwrap()
         .block_on(async move {
+            let log = Arc::new(log::Log::new());
+            let (notify_tx, notify_rx) = mpsc::channel(1000);
+
             let (tx, rx) = mpsc::channel(1000);
 
-            spawn(monitor::main_monitor(state.clone(), rx));
-            webserver::webserver(&state, tx).await;
+            let notifier = spawn(notifier::notifier(state.clone(), log.clone(), notify_rx));
+            let monitor = spawn(monitor::main_monitor(state.clone(), rx, notify_tx));
+            let web_server = spawn(webserver::webserver(state.clone(), tx, log.clone()));
+            log.note("Server started up");
+            tokio::join!(notifier, monitor, web_server);
         });
 }
