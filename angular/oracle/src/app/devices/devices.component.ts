@@ -23,8 +23,8 @@ export class DevicesComponent implements OnInit {
   }
 
   get_status(id) {
-    let state = this.status[id];
-    return state || {state: "Unknown", since: this.start}
+    let status = this.status[id];
+    return status || { status: "Unknown", since: this.start }
   }
 
   constructor(private modal: NzModalService, private viewContainerRef: ViewContainerRef) { }
@@ -70,17 +70,19 @@ export class DevicesComponent implements OnInit {
   ngOnInit(): void {
     this.update()
 
-    console.log(`ws://${window.location.host}/api/devices/status`)
-
     this.ws = new WebSocket(`ws://${window.location.host}/api/devices/status`)
     this.ws.onmessage = event => {
       let events = JSON.parse(event.data);
 
+      let status = Object.assign({}, this.status);
+
       for (let event of events) {
         console.log(event)
-        this.status[event.id] = {status: event.status, since: event.since.secs_since_epoch}
+        status[event.id] = { status: event.status, since: event.since && event.since.secs_since_epoch }
       }
-      
+
+      this.status = status;
+
     };
     this.ws.onopen = ev => {
       console.log("wsopen")
@@ -91,8 +93,6 @@ export class DevicesComponent implements OnInit {
     this.ws.onerror = ev => {
       console.log("wserror", ev)
     }
-    console.log("wscreate")
-
   }
 
   ngOnDestroy() {

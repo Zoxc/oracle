@@ -4,8 +4,6 @@ use serde_json;
 use std::fs;
 use std::sync::Arc;
 
-pub type DeviceId = u32;
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Configuration {
     pub web_port: u16,
@@ -27,6 +25,7 @@ impl Configuration {
 }
 
 pub type State = Arc<Mutex<Configuration>>;
+pub type Conf = Arc<Mutex<Configuration>>;
 
 pub fn load() -> State {
     Arc::new(Mutex::new(Configuration::load()))

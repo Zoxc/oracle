@@ -30,6 +30,10 @@ export class AddDeviceComponent implements OnInit {
     if (data.name === "") {
       delete data.name;
     }
+    data.ipv4 = data.ipv4.trim();
+    if (data.ipv4 === "") {
+      delete data.ipv4;
+    }
     data.id = 0;
 
     console.log(data);

@@ -1,35 +1,39 @@
+use crate::devices::DeviceChange;
 use crate::devices::Devices;
 use crate::log::Kind;
 use crate::log::Log;
 use crate::monitor::DeviceStatus;
-use crate::monitor::DeviceUpdate;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::spawn;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::{delay_for, Duration};
 
-pub async fn notifier(
-    devices: Arc<Mutex<Devices>>,
-    log: Arc<Log>,
-    mut receiver: mpsc::Receiver<DeviceUpdate>,
-) {
+pub async fn notifier(devices: Arc<Mutex<Devices>>, log: Arc<Log>) {
+    let mut receiver = devices.lock().changes.subscribe();
     let mut buffer = Vec::new();
     let mut active = false;
     let (send_email_signal, mut email_signal) = mpsc::channel(10);
 
     loop {
         tokio::select! {
-            Some(msg) = receiver.recv() => {
-                let desc = devices.lock().device(msg.id).desc();
+            Ok(change) = receiver.recv() => {
+                let (device, status, since) = match change {
+                    DeviceChange::IPv4Status { device, old, new, since } if old != DeviceStatus::Unknown && new != DeviceStatus::Unknown => {
+                        (device, new, since)
+                    }
+                    _ => continue,
+                };
 
-                match msg.status {
+                let desc = devices.lock().device(device).conf.desc();
+
+                match status {
                     DeviceStatus::Up => log.log(Kind::Note, &format!("Device {} is up", desc)),
                     DeviceStatus::Down => log.log(Kind::Error, &format!("Device {} is down", desc)),
                     _ => (),
                 }
 
-                buffer.push(msg);
+                buffer.push((device, status));
 
                 if !active {
                     active = true;

@@ -13,6 +13,10 @@ export class SinceComponent implements OnInit {
 
   constructor() { }
 
+  ngOnChanges() {
+    this.now = Date.now()
+  }
+
   ngOnInit(): void {
     this.interval = setInterval(() => {
       this.now = Date.now()

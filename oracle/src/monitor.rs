@@ -1,6 +1,5 @@
-use crate::devices::{DeviceChange, Devices};
+use crate::devices::{DeviceChange, DeviceId, Devices};
 use crate::ping::Ping;
-use crate::state::DeviceId;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -9,6 +8,23 @@ use std::{collections::HashMap, sync::atomic::AtomicBool};
 use std::{net::Ipv4Addr, sync::atomic::Ordering};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{delay_for, timeout, Duration};
+
+#[derive(Debug, Clone)]
+pub struct CancelToken(Arc<AtomicBool>);
+
+impl CancelToken {
+    pub fn new() -> Self {
+        CancelToken(Arc::new(AtomicBool::new(false)))
+    }
+
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+
+    pub fn cancelled(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub enum DeviceStatus {
@@ -25,13 +41,13 @@ struct DeviceState {
     aborted: Arc<AtomicBool>,
 }
 
-async fn device_monitor(
+pub async fn device_monitor(
+    devices: Arc<Mutex<Devices>>,
     ip: Ipv4Addr,
     mut ping: Ping,
     mut status: DeviceStatus,
-    id: DeviceId,
-    mut tx: mpsc::Sender<DeviceUpdate>,
-    aborted: Arc<AtomicBool>,
+    device: DeviceId,
+    cancel: CancelToken,
 ) {
     loop {
         let new_status = match timeout(Duration::from_secs(1), ping.ping(ip)).await {
@@ -55,29 +71,42 @@ async fn device_monitor(
             }
         };
 
-        if aborted.load(Ordering::SeqCst) {
+        if cancel.cancelled() {
             break;
         }
 
         if status != new_status {
+            let time = SystemTime::now();
+
+            let mut devices = devices.lock();
+
+            // Check that we're not cancelled in the lock, so we have permission to update the device
+            if cancel.cancelled() {
+                break;
+            }
+
+            {
+                let mut device = devices.device_mut(device);
+                device.ipv4_status = new_status;
+                device.ipv4_status_since = Some(time);
+            }
+
+            devices
+                .changes
+                .send(DeviceChange::IPv4Status {
+                    device,
+                    old: status,
+                    new: new_status,
+                    since: Some(time),
+                })
+                .ok();
             status = new_status;
-            tx.send(DeviceUpdate {
-                id,
-                status,
-                since: SystemTime::now(),
-            })
-            .await
-            .unwrap();
         }
 
         delay_for(Duration::from_millis(10000)).await;
-
-        if aborted.load(Ordering::SeqCst) {
-            break;
-        }
     }
 }
-
+/*
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceUpdate {
     pub id: DeviceId,
@@ -188,3 +217,4 @@ pub async fn main_monitor(
         };
     }
 }
+*/

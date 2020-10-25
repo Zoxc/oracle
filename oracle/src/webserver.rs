@@ -1,6 +1,5 @@
 use crate::devices::{self, Devices};
 use crate::log::{self, Log};
-use crate::monitor::SubscribeResponse;
 use crate::state::{Configuration, State};
 use parking_lot::Mutex;
 use serde_json;
@@ -38,12 +37,7 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
     read_settings.or(write_settings).boxed()
 }
 
-pub async fn webserver(
-    devices: Arc<Mutex<Devices>>,
-    state: State,
-    subscribe_status: mpsc::Sender<oneshot::Sender<SubscribeResponse>>,
-    log: Arc<Log>,
-) {
+pub async fn webserver(devices: Arc<Mutex<Devices>>, state: State, log: Arc<Log>) {
     let port = state.lock().web_port;
 
     let files = warp::fs::dir("web");
@@ -55,9 +49,7 @@ pub async fn webserver(
 
     let log = warp::path!("log").and(log::websocket(log));
 
-    let api = settings(&state)
-        .or(devices::webserver(devices, subscribe_status))
-        .or(log);
+    let api = settings(&state).or(devices::webserver(devices)).or(log);
 
     let api = warp::path("api").and(api);
 

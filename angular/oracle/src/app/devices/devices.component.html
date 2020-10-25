@@ -34,7 +34,7 @@
                 </td>
 
                 <td>
-                    <app-since [since]="get_status(data.id).since"></app-since>
+                    <app-since *ngIf="get_status(data.id).since" [since]="get_status(data.id).since"></app-since>
                 </td>
 
                 <td>
