@@ -6,9 +6,9 @@ use crate::{
     devices::{DeviceChange, DeviceId},
     state::Conf,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local};
 use lettre::{smtp::authentication::Credentials, SmtpClient, Transport};
-use lettre_email::EmailBuilder;
+use lettre_email::{EmailBuilder, Mailbox};
 use std::{sync::Arc, time::SystemTime};
 use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
@@ -24,20 +24,43 @@ pub fn send_email(
     let mut body = "The following network changes were detected:\n\n".to_owned();
 
     for change in changes {
-        let time: DateTime<Utc> = change.1 .1.into();
+        let time: DateTime<Local> = change.1 .1.into();
         let time = time.to_rfc2822();
         let verb = match change.1 .0 {
             ServiceStatus::Up => "up",
             ServiceStatus::Down => "down",
         };
         let desc = devices.device(change.0).conf.lock().desc();
-        body.push_str(&format!(" - {} went {} at {:?}", desc, verb, time));
+        body.push_str(&format!(" - Device `{}` went {} at {}", desc, verb, time));
     }
 
     let smtp = conf.lock().smtp.clone().unwrap();
+
+    let from = match smtp.from.parse::<Mailbox>() {
+        Ok(from) => from,
+        _ => {
+            log.log(
+                Kind::Error,
+                &format!("Unable to parse {} as an email address", smtp.from),
+            );
+            return false;
+        }
+    };
+
+    let to = match email_receiver.parse::<Mailbox>() {
+        Ok(to) => to,
+        _ => {
+            log.log(
+                Kind::Error,
+                &format!("Unable to parse {} as an email address", email_receiver),
+            );
+            return false;
+        }
+    };
+
     let email = EmailBuilder::new()
-        .from(smtp.from)
-        .to(email_receiver)
+        .from(from)
+        .to(to)
         .subject("Network changes")
         .body(body)
         .build();
