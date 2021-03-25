@@ -3,11 +3,9 @@ use crate::devices::Devices;
 use crate::devices::ServiceStatus;
 use crate::log::Kind;
 use crate::log::Log;
-use crate::monitor::DeviceStatus;
-use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::spawn;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
 
 pub async fn notifier(
@@ -23,7 +21,7 @@ pub async fn notifier(
         tokio::select! {
             Some(change) = receiver.recv() => {
                 let (device, status) = match change {
-                    DeviceChange::IPv4Status { device, old: Some(old), new: Some(new) } => {
+                    DeviceChange::IPv4Status { device, old: Some(_), new: Some(new) } => {
                         (device, new)
                     }
                     _ => continue,

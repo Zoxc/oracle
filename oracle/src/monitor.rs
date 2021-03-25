@@ -1,12 +1,8 @@
-use crate::devices::{Device, DeviceChange, DeviceId, Devices, ServiceStatus};
-use crate::ping::Ping;
-use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
+use crate::devices::{Device, DeviceChange, Devices, ServiceStatus};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::SystemTime;
-use std::{collections::HashMap, sync::atomic::AtomicBool};
 use std::{net::Ipv4Addr, sync::atomic::Ordering};
-use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{delay_for, timeout, Duration};
 
 #[derive(Debug, Clone)]
@@ -24,21 +20,6 @@ impl CancelToken {
     pub fn cancelled(&self) -> bool {
         self.0.load(Ordering::SeqCst)
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
-pub enum DeviceStatus {
-    Unknown,
-    Up,
-    Down,
-}
-
-#[derive(Debug)]
-struct DeviceState {
-    status: DeviceStatus,
-    since: SystemTime,
-    ipv4: Ipv4Addr,
-    aborted: Arc<AtomicBool>,
 }
 
 pub async fn device_monitor(

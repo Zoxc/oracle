@@ -1,4 +1,4 @@
-use crate::monitor::{self, CancelToken, DeviceStatus};
+use crate::monitor::{self, CancelToken};
 use crate::ping::Ping;
 use crate::state::Conf;
 use futures::{SinkExt, StreamExt};
@@ -9,7 +9,7 @@ use std::fs;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc};
 use warp::ws;
 use warp::{filters::BoxedFilter, Filter, Reply};
 
@@ -253,7 +253,7 @@ pub fn webserver(devices: Arc<Devices>) -> BoxedFilter<(impl Reply,)> {
                         },
                         Ok(change) = changes.recv() => {
                             let (device, status) = match change {
-                                DeviceChange::IPv4Status { device, old, new } => {
+                                DeviceChange::IPv4Status { device, old: _, new } => {
                                     (device, new)
                                 }
                                 _ => continue,

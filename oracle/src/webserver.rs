@@ -1,11 +1,9 @@
 use crate::devices::{self, Devices};
 use crate::log::{self, Log};
 use crate::state::{Configuration, State};
-use parking_lot::Mutex;
 use serde_json;
 use std::str;
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
 use warp::{filters::BoxedFilter, Filter, Reply};
 
 fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
