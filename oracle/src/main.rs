@@ -22,16 +22,15 @@ fn main() {
         .block_on(async move {
             let state = state::load();
             let log = Arc::new(log::Log::new());
-            let devices = devices::load(state.clone());
-
-            let notifier = spawn(notifier::notifier(devices.clone(), log.clone()));
-            //let monitor = spawn(monitor::main_monitor(devices.clone(), rx, notify_tx));
+            let (tx, rx) = mpsc::channel(1000);
+            let devices = devices::load(state.clone(), tx);
+            let notifier = spawn(notifier::notifier(devices.clone(), log.clone(), rx));
             let web_server = spawn(webserver::webserver(
                 devices.clone(),
                 state.clone(),
                 log.clone(),
             ));
             log.note("Server started up");
-            let _ = tokio::join!(notifier /*, monitor*/, web_server);
+            let _ = tokio::join!(notifier, web_server);
         });
 }

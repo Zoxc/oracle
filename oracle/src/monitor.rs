@@ -1,4 +1,4 @@
-use crate::devices::{DeviceChange, DeviceId, Devices};
+use crate::devices::{Device, DeviceChange, DeviceId, Devices, ServiceStatus};
 use crate::ping::Ping;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -42,25 +42,28 @@ struct DeviceState {
 }
 
 pub async fn device_monitor(
-    devices: Arc<Mutex<Devices>>,
+    devices: Arc<Devices>,
+    device: Arc<Device>,
     ip: Ipv4Addr,
-    mut ping: Ping,
-    mut status: DeviceStatus,
-    device: DeviceId,
     cancel: CancelToken,
 ) {
+    let id = device.conf.lock().id;
+    let mut ping = devices.ping.clone();
+    let mut notifier = devices.notifier.clone();
+    let mut status = device.icmpv4.lock().status;
+
     loop {
         let new_status = match timeout(Duration::from_secs(1), ping.ping(ip)).await {
-            Ok(_) => DeviceStatus::Up,
+            Ok(_) => ServiceStatus::Up,
             Err(_) => {
-                let mut new_status = DeviceStatus::Down;
+                let mut new_status = ServiceStatus::Down;
 
                 // Ping timed out, try 10 times before registering the device as down
-                for _ in 0..9i32 {
+                for _ in 0..10i32 {
                     delay_for(Duration::from_secs(1)).await;
                     match timeout(Duration::from_secs(1), ping.ping(ip)).await {
                         Ok(_) => {
-                            new_status = DeviceStatus::Up;
+                            new_status = ServiceStatus::Up;
                             break;
                         }
                         Err(_) => {}
@@ -75,31 +78,34 @@ pub async fn device_monitor(
             break;
         }
 
-        if status != new_status {
+        if status.map(|s| s.0) != Some(new_status) {
             let time = SystemTime::now();
 
-            let mut devices = devices.lock();
+            let new_status = Some((new_status, time));
 
-            // Check that we're not cancelled in the lock, so we have permission to update the device
-            if cancel.cancelled() {
-                break;
-            }
+            let change = {
+                let mut icmpv4 = device.icmpv4.lock();
 
-            {
-                let mut device = devices.device_mut(device);
-                device.ipv4_status = new_status;
-                device.ipv4_status_since = Some(time);
-            }
+                // Check that we're not cancelled in the lock, so we have permission to update the device
+                if cancel.cancelled() {
+                    break;
+                }
 
-            devices
-                .changes
-                .send(DeviceChange::IPv4Status {
-                    device,
+                icmpv4.status = new_status;
+
+                let change = DeviceChange::IPv4Status {
+                    device: id,
                     old: status,
                     new: new_status,
-                    since: Some(time),
-                })
-                .ok();
+                };
+
+                devices.changes.send(change.clone()).ok();
+
+                change
+            };
+
+            notifier.send(change).await.unwrap();
+
             status = new_status;
         }
 
@@ -121,7 +127,7 @@ pub struct SubscribeResponse {
 }
 
 pub async fn main_monitor(
-    devices: Arc<Mutex<Devices>>,
+    devices: Arc<Devices>,
     mut subscribe_request: mpsc::Receiver<oneshot::Sender<SubscribeResponse>>,
     mut aborted: mpsc::Sender<DeviceUpdate>,
 ) {

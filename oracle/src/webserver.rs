@@ -37,7 +37,7 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
     read_settings.or(write_settings).boxed()
 }
 
-pub async fn webserver(devices: Arc<Mutex<Devices>>, state: State, log: Arc<Log>) {
+pub async fn webserver(devices: Arc<Devices>, state: State, log: Arc<Log>) {
     let port = state.lock().web_port;
 
     let files = warp::fs::dir("web");

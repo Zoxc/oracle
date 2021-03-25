@@ -77,8 +77,9 @@ export class DevicesComponent implements OnInit {
       let status = Object.assign({}, this.status);
 
       for (let event of events) {
-        console.log(event)
-        status[event.id] = { status: event.status, since: event.since && event.since.secs_since_epoch }
+        if (event.status) {
+          status[event.id] = { status: event.status[0], since: event.status[1].secs_since_epoch }
+        }
       }
 
       this.status = status;

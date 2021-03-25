@@ -38,12 +38,24 @@ impl DeviceConf {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+pub enum ServiceStatus {
+    Up,
+    Down,
+}
+
+#[derive(Debug, Default)]
+pub struct Service {
+    pub status: Option<(ServiceStatus, SystemTime)>,
+    pub monitor: Option<CancelToken>,
+}
+
 #[derive(Debug)]
 pub struct Device {
-    pub conf: DeviceConf,
-    pub ipv4_status: DeviceStatus,
-    pub ipv4_status_since: Option<SystemTime>,
-    pub ipv4_monitor: Option<CancelToken>,
+    pub conf: Mutex<DeviceConf>,
+
+    // `conf` lock taken before `icmpv4`
+    pub icmpv4: Mutex<Service>,
 }
 
 impl Device {
@@ -51,10 +63,8 @@ impl Device {
         let mut conf: DeviceConf = Default::default();
         conf.id = id;
         Self {
-            conf,
-            ipv4_status: DeviceStatus::Unknown,
-            ipv4_status_since: None,
-            ipv4_monitor: None,
+            conf: Mutex::new(conf),
+            icmpv4: Default::default(),
         }
     }
 }
@@ -65,68 +75,71 @@ pub enum DeviceChange {
     Removed(DeviceId),
     IPv4Status {
         device: DeviceId,
-        old: DeviceStatus,
-        new: DeviceStatus,
-        since: Option<SystemTime>,
+        old: Option<(ServiceStatus, SystemTime)>,
+        new: Option<(ServiceStatus, SystemTime)>,
     },
 }
 
 pub struct Devices {
-    pub list: Vec<Device>,
+    pub list: Mutex<Vec<Arc<Device>>>,
     pub changes: broadcast::Sender<DeviceChange>,
+    pub notifier: mpsc::Sender<DeviceChange>,
     pub conf: Conf,
     pub ping: Ping,
 }
 
 impl Devices {
-    pub fn add(&mut self, conf: DeviceConf, devices: Arc<Mutex<Devices>>) {
+    pub fn add(self: &Arc<Self>, conf: DeviceConf) {
         let id = conf.id;
-        self.list.push(Device::new(id));
-        self.change(id, conf, devices);
-        //devices.changes.send(DeviceChange::Added(device.id)).ok();
+        self.list.lock().push(Arc::new(Device::new(id)));
+        self.change(id, conf);
+        self.changes.send(DeviceChange::Added(id)).ok();
     }
 
-    pub fn remove(&mut self, id: DeviceId, devices: Arc<Mutex<Devices>>) {
-        self.change(id, Default::default(), devices);
+    pub fn remove(self: &Arc<Self>, id: DeviceId) {
         let index = self.device_index(id);
-        index.map(|index| self.list.remove(index));
-        //self.changes.send(DeviceChange::Removed(id)).ok();
+        self.change(id, Default::default());
+        index.map(|index| self.list.lock().remove(index));
+        self.changes.send(DeviceChange::Removed(id)).ok();
     }
 
-    pub fn change(&mut self, id: DeviceId, conf: DeviceConf, devices: Arc<Mutex<Devices>>) {
-        let index = if let Some(index) = self.device_index(id) {
-            index
-        } else {
-            return;
-        };
-        let old_conf = self.list[index].conf.clone();
-        let device = &mut self.list[index];
+    pub fn change(self: &Arc<Self>, id: DeviceId, conf: DeviceConf) {
+        let device = self.device(id);
+        let mut device_conf = device.conf.lock();
+        let old_conf = device_conf.clone();
 
         if old_conf.ipv4 != conf.ipv4 {
-            device.ipv4_monitor.as_ref().map(|token| token.cancel());
-            device.ipv4_monitor = None;
+            let mut icmpv4 = device.icmpv4.lock();
+            icmpv4.monitor.as_ref().map(|token| token.cancel());
+            icmpv4.monitor = None;
 
             if let Some(ipv4) = conf.ipv4 {
                 let token = CancelToken::new();
-                device.ipv4_monitor = Some(token.clone());
+                icmpv4.monitor = Some(token.clone());
                 tokio::spawn(monitor::device_monitor(
-                    devices,
+                    self.clone(),
+                    device.clone(),
                     ipv4,
-                    self.ping.clone(),
-                    device.ipv4_status,
-                    id,
                     token,
                 ));
+            } else {
+                icmpv4.status = None;
             }
         }
 
-        device.conf = conf;
+        *device_conf = conf;
     }
 
     pub fn new_device_id(&self) -> DeviceId {
         // TODO: Race condition. Old Ids may still be referenced by tasks (and browsers)
         for i in 0..=(u32::MAX) {
-            if self.list.iter().find(|d| d.conf.id == i).is_none() {
+            if self
+                .list
+                .lock()
+                .iter()
+                .find(|d| d.conf.lock().id == i)
+                .is_none()
+            {
                 return i;
             }
         }
@@ -134,7 +147,12 @@ impl Devices {
     }
 
     pub fn save(&self) {
-        let confs: Vec<_> = self.list.iter().map(|device| &device.conf).collect();
+        let confs: Vec<_> = self
+            .list
+            .lock()
+            .iter()
+            .map(|device| device.conf.lock().clone())
+            .collect();
         fs::write(
             "data/devices.json",
             serde_json::to_string_pretty(&confs).unwrap(),
@@ -144,30 +162,31 @@ impl Devices {
 
     pub fn device_index(&self, id: DeviceId) -> Option<usize> {
         self.list
+            .lock()
             .iter()
             .enumerate()
-            .find(|d| d.1.conf.id == id)
+            .find(|d| d.1.conf.lock().id == id)
             .map(|d| d.0)
     }
 
-    pub fn device(&self, id: DeviceId) -> &Device {
-        &self.list[self.device_index(id).unwrap()]
-    }
-
-    pub fn device_mut(&mut self, id: DeviceId) -> &mut Device {
+    pub fn device(&self, id: DeviceId) -> Arc<Device> {
         let index = self.device_index(id).unwrap();
-        &mut self.list[index]
+        self.list.lock()[index].clone()
     }
 }
 
-pub fn webserver(devices: Arc<Mutex<Devices>>) -> BoxedFilter<(impl Reply,)> {
+pub fn webserver(devices: Arc<Devices>) -> BoxedFilter<(impl Reply,)> {
     let devices_ = devices.clone();
     let list_devices = warp::path("devices")
         .and(warp::get())
         .and(warp::path::end())
         .map(move || {
-            let devices = devices_.lock();
-            let confs: Vec<_> = devices.list.iter().map(|device| &device.conf).collect();
+            let confs: Vec<_> = devices_
+                .list
+                .lock()
+                .iter()
+                .map(|device| device.conf.lock().clone())
+                .collect();
             serde_json::to_string(&confs).unwrap()
         });
 
@@ -176,14 +195,14 @@ pub fn webserver(devices: Arc<Mutex<Devices>>) -> BoxedFilter<(impl Reply,)> {
         .and(warp::post())
         .and(warp::path::end())
         .and(warp::body::json())
-        .map(move |device: DeviceConf| {
+        .map(move |mut device: DeviceConf| {
             //let ipv4 = from_map(&config, "ipv4");
 
             println!("device: {:?}", device);
 
-            let mut devices = devices_.lock();
-            devices.add(device, devices_.clone());
-            devices.save();
+            device.id = devices_.new_device_id();
+            devices_.add(device);
+            devices_.save();
 
             ""
         });
@@ -192,9 +211,8 @@ pub fn webserver(devices: Arc<Mutex<Devices>>) -> BoxedFilter<(impl Reply,)> {
     let remove = warp::path!("device" / u32)
         .and(warp::delete())
         .map(move |id| {
-            let mut devices = devices_.lock();
-            devices.remove(id, devices_.clone());
-            devices.save();
+            devices_.remove(id);
+            devices_.save();
 
             ""
         });
@@ -208,15 +226,17 @@ pub fn webserver(devices: Arc<Mutex<Devices>>) -> BoxedFilter<(impl Reply,)> {
                 let (mut tx, mut rx) = websocket.split();
 
                 let (initial, mut changes) = {
-                    let devices = devices_.lock();
-                    let initial: Vec<_> = devices
+                    let initial: Vec<_> = devices_
                         .list
+                        .lock()
                         .iter()
                         .map(|device| {
-                            json!({"id": device.conf.id, "status": device.ipv4_status, "since": device.ipv4_status_since})
+                            let id = device.conf.lock().id;
+                            let icmpv4 = device.icmpv4.lock();
+                            json!({"id": id, "status": icmpv4.status})
                         })
                         .collect();
-                    let changes = devices.changes.subscribe();
+                    let changes = devices_.changes.subscribe();
                     (initial, changes)
                 };
 
@@ -232,14 +252,14 @@ pub fn webserver(devices: Arc<Mutex<Devices>>) -> BoxedFilter<(impl Reply,)> {
                             }
                         },
                         Ok(change) = changes.recv() => {
-                            let (device, status, since) = match change {
-                                DeviceChange::IPv4Status { device, old, new, since } => {
-                                    (device, new, since)
+                            let (device, status) = match change {
+                                DeviceChange::IPv4Status { device, old, new } => {
+                                    (device, new)
                                 }
                                 _ => continue,
                             };
 
-                            let val = json!([{"id": device, "status": status, "since": since}]);
+                            let val = json!([{"id": device, "status": status}]);
 
                             tx.send(ws::Message::text(
                                 serde_json::to_string(&val).unwrap(),
@@ -256,26 +276,23 @@ pub fn webserver(devices: Arc<Mutex<Devices>>) -> BoxedFilter<(impl Reply,)> {
     list_devices.or(add).or(remove).or(status).boxed()
 }
 
-pub fn load(conf: Conf) -> Arc<Mutex<Devices>> {
+pub fn load(conf: Conf, notifier: mpsc::Sender<DeviceChange>) -> Arc<Devices> {
     let ping = Ping::new();
 
     let (changes, _) = broadcast::channel(1000);
-    let devices = Arc::new(Mutex::new(Devices {
-        list: Vec::new(),
+    let devices = Arc::new(Devices {
+        list: Mutex::new(Vec::new()),
         changes,
         conf,
         ping,
-    }));
+        notifier,
+    });
 
     let list: Vec<DeviceConf> =
         serde_json::from_str(&fs::read_to_string("data/devices.json").unwrap()).unwrap();
 
-    {
-        let mut lock = devices.lock();
-
-        for device in list {
-            lock.add(device, devices.clone());
-        }
+    for device in list {
+        devices.add(device);
     }
 
     devices

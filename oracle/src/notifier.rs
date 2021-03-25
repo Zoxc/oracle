@@ -1,5 +1,6 @@
 use crate::devices::DeviceChange;
 use crate::devices::Devices;
+use crate::devices::ServiceStatus;
 use crate::log::Kind;
 use crate::log::Log;
 use crate::monitor::DeviceStatus;
@@ -9,28 +10,30 @@ use tokio::spawn;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{delay_for, Duration};
 
-pub async fn notifier(devices: Arc<Mutex<Devices>>, log: Arc<Log>) {
-    let mut receiver = devices.lock().changes.subscribe();
+pub async fn notifier(
+    devices: Arc<Devices>,
+    log: Arc<Log>,
+    mut receiver: mpsc::Receiver<DeviceChange>,
+) {
     let mut buffer = Vec::new();
     let mut active = false;
     let (send_email_signal, mut email_signal) = mpsc::channel(10);
 
     loop {
         tokio::select! {
-            Ok(change) = receiver.recv() => {
-                let (device, status, since) = match change {
-                    DeviceChange::IPv4Status { device, old, new, since } if old != DeviceStatus::Unknown && new != DeviceStatus::Unknown => {
-                        (device, new, since)
+            Some(change) = receiver.recv() => {
+                let (device, status) = match change {
+                    DeviceChange::IPv4Status { device, old: Some(old), new: Some(new) } => {
+                        (device, new)
                     }
                     _ => continue,
                 };
 
-                let desc = devices.lock().device(device).conf.desc();
+                let desc = devices.device(device).conf.lock().desc();
 
-                match status {
-                    DeviceStatus::Up => log.log(Kind::Note, &format!("Device {} is up", desc)),
-                    DeviceStatus::Down => log.log(Kind::Error, &format!("Device {} is down", desc)),
-                    _ => (),
+                match status.0 {
+                    ServiceStatus::Up => log.log(Kind::Note, &format!("Device {} is up", desc)),
+                    ServiceStatus::Down => log.log(Kind::Error, &format!("Device {} is down", desc)),
                 }
 
                 buffer.push((device, status));
