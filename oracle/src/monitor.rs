@@ -30,7 +30,6 @@ pub async fn device_monitor(
 ) {
     let id = device.conf.lock().id;
     let mut ping = devices.ping.clone();
-    let mut notifier = devices.notifier.clone();
     let mut status = device.icmpv4.lock().status;
 
     loop {
@@ -85,7 +84,7 @@ pub async fn device_monitor(
                 change
             };
 
-            notifier.send(change).await.unwrap();
+            devices.notify(change).await;
 
             status = new_status;
         }

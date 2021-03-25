@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use tokio::spawn;
-use tokio::sync::mpsc;
 use tracing_subscriber;
 
 mod devices;
@@ -22,15 +21,13 @@ fn main() {
         .block_on(async move {
             let state = state::load();
             let log = Arc::new(log::Log::new());
-            let (tx, rx) = mpsc::channel(1000);
-            let devices = devices::load(state.clone(), tx);
-            let notifier = spawn(notifier::notifier(devices.clone(), log.clone(), rx));
+            let devices = devices::load(state.clone(), log.clone());
             let web_server = spawn(webserver::webserver(
                 devices.clone(),
                 state.clone(),
                 log.clone(),
             ));
             log.note("Server started up");
-            let _ = tokio::join!(notifier, web_server);
+            web_server.await.unwrap();
         });
 }

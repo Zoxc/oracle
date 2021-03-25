@@ -1,6 +1,6 @@
 use crate::devices::{self, Devices};
 use crate::log::{self, Log};
-use crate::state::{Configuration, State};
+use crate::state::{Config, State};
 use serde_json;
 use std::str;
 use std::sync::Arc;
@@ -21,10 +21,10 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
         .and(warp::post())
         .and(warp::path::end())
         .and(warp::body::json())
-        .map(move |config: Configuration| {
+        .map(move |config: Config| {
             if config.web_port != 0 && config.ping_interval != 0 {
                 let mut state = state_.lock();
-                *state = config;
+                state.config = config;
                 state.save();
                 ""
             } else {
@@ -36,7 +36,7 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
 }
 
 pub async fn webserver(devices: Arc<Devices>, state: State, log: Arc<Log>) {
-    let port = state.lock().web_port;
+    let port = state.lock().config.web_port;
 
     let files = warp::fs::dir("web");
     let index = warp::fs::file("web/index.html");

@@ -5,9 +5,25 @@ use std::fs;
 use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Configuration {
+pub struct Smtp {
+    pub server: String,
+    pub from: String,
+    pub user: String,
+    pub password: String,
+    pub recievers: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Config {
     pub web_port: u16,
     pub ping_interval: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Configuration {
+    #[serde(flatten)]
+    pub config: Config,
+    pub smtp: Option<Smtp>,
 }
 
 impl Configuration {

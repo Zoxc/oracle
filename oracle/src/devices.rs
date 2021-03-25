@@ -1,6 +1,9 @@
-use crate::monitor::{self, CancelToken};
-use crate::ping::Ping;
 use crate::state::Conf;
+use crate::{log::Kind, log::Log, ping::Ping};
+use crate::{
+    monitor::{self, CancelToken},
+    notifier,
+};
 use futures::{SinkExt, StreamExt};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -9,7 +12,10 @@ use std::fs;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    spawn,
+    sync::{broadcast, mpsc},
+};
 use warp::ws;
 use warp::{filters::BoxedFilter, Filter, Reply};
 
@@ -83,12 +89,39 @@ pub enum DeviceChange {
 pub struct Devices {
     pub list: Mutex<Vec<Arc<Device>>>,
     pub changes: broadcast::Sender<DeviceChange>,
-    pub notifier: mpsc::Sender<DeviceChange>,
+    pub notifiers: Mutex<Vec<mpsc::Sender<DeviceChange>>>,
     pub conf: Conf,
     pub ping: Ping,
+    pub log: Arc<Log>,
 }
 
 impl Devices {
+    pub async fn notify(self: &Arc<Self>, change: DeviceChange) {
+        let (device, status) = match change.clone() {
+            DeviceChange::IPv4Status {
+                device,
+                old: Some(_),
+                new: Some(new),
+            } => (device, new),
+            _ => return,
+        };
+
+        let desc = self.device(device).conf.lock().desc();
+
+        match status.0 {
+            ServiceStatus::Up => self.log.log(Kind::Note, &format!("Device {} is up", desc)),
+            ServiceStatus::Down => self
+                .log
+                .log(Kind::Error, &format!("Device {} is down", desc)),
+        }
+
+        let notifiers = self.notifiers.lock().clone();
+
+        for mut notifier in notifiers {
+            notifier.send(change.clone()).await.unwrap();
+        }
+    }
+
     pub fn add(self: &Arc<Self>, conf: DeviceConf) {
         let id = conf.id;
         self.list.lock().push(Arc::new(Device::new(id)));
@@ -276,17 +309,40 @@ pub fn webserver(devices: Arc<Devices>) -> BoxedFilter<(impl Reply,)> {
     list_devices.or(add).or(remove).or(status).boxed()
 }
 
-pub fn load(conf: Conf, notifier: mpsc::Sender<DeviceChange>) -> Arc<Devices> {
+pub fn load(conf: Conf, log: Arc<Log>) -> Arc<Devices> {
     let ping = Ping::new();
 
     let (changes, _) = broadcast::channel(1000);
+
+    let receivers = conf
+        .lock()
+        .smtp
+        .as_ref()
+        .map(|smtp| smtp.recievers.clone())
+        .unwrap_or_default();
+
     let devices = Arc::new(Devices {
         list: Mutex::new(Vec::new()),
         changes,
-        conf,
+        conf: conf.clone(),
         ping,
-        notifier,
+        log: log.clone(),
+        notifiers: Mutex::new(Vec::new()),
     });
+
+    for receiver in receivers {
+        let (tx, rx) = mpsc::channel(1000);
+
+        spawn(notifier::notifier(
+            conf.clone(),
+            devices.clone(),
+            log.clone(),
+            receiver.clone(),
+            rx,
+        ));
+
+        devices.notifiers.lock().push(tx);
+    }
 
     let list: Vec<DeviceConf> =
         serde_json::from_str(&fs::read_to_string("data/devices.json").unwrap()).unwrap();
