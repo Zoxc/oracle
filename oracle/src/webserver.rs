@@ -12,7 +12,7 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
         .and(warp::get())
         .and(warp::path::end())
         .map(move || {
-            let config = state_.lock().clone();
+            let config = state_.lock().config.clone();
             serde_json::to_string(&config).unwrap()
         });
 

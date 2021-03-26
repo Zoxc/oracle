@@ -27,6 +27,7 @@ import { SettingsComponent } from './settings/settings.component';
 import { AddDeviceComponent } from './add-device/add-device.component';
 import { SinceComponent } from './since/since.component';
 import { LogComponent } from './log/log.component';
+import { LoginComponent } from './login/login.component';
 
 registerLocaleData(en);
 
@@ -37,7 +38,8 @@ registerLocaleData(en);
     SettingsComponent,
     AddDeviceComponent,
     SinceComponent,
-    LogComponent
+    LogComponent,
+    LoginComponent
   ],
   imports: [
     BrowserModule,

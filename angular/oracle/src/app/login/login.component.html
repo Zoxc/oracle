@@ -1,0 +1,22 @@
+<div id="content">
+    <h2 style="text-align: center;"><i nz-icon nzType="radar-chart"></i> Oracle</h2>
+    <form nz-form>
+        <nz-form-item>
+            <nz-form-label nzFor="web_port">Username</nz-form-label>
+            <nz-form-control nzErrorTip="Please a webserver port!">
+                <input nz-input id="web_port" placeholder="">
+            </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+            <nz-form-label nzFor="ping_interval">Password</nz-form-label>
+            <nz-form-control nzErrorTip="Please input name!">
+                <input nz-input id="ping_interval" placeholder="">
+            </nz-form-control>
+        </nz-form-item>
+        <nz-form-item nz-row>
+            <nz-form-control [nzSpan]="14" [nzOffset]="6">
+                <button nz-button nzType="primary">Login</button>
+            </nz-form-control>
+        </nz-form-item>
+    </form>
+</div>

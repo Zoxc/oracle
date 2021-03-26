@@ -3,7 +3,7 @@ import { FormBuilder, FormControl, FormGroup, Validators, ValidatorFn } from '@a
 
 function tcp_port_validator(control: FormControl) {
   if (isNaN(Number(control.value))) {
-    return {"test": "hm"};
+    return { "test": "hm" };
   }
 
   let number = parseInt(control.value, 10);
@@ -12,7 +12,7 @@ function tcp_port_validator(control: FormControl) {
     return null;
   }
 
-  return {"test": "hm"};
+  return { "test": "hm" };
 }
 
 @Component({
@@ -32,7 +32,7 @@ export class SettingsComponent implements OnInit {
 
   ngOnInit(): void {
     fetch("/api/settings").then(response => response.json())
-      .then(data => { 
+      .then(data => {
         this.initial = data;
         this.form.setValue(data);
         this.loaded = true;

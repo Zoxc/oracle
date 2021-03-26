@@ -1,13 +1,14 @@
-<nz-layout class="layout">
+<nz-layout class="layout" *ngIf="url != 'login'">
   <nz-sider class="menu-sidebar" nzTheme="light">
     <div
       style="background-color: rgb(0, 21, 41);color:rgba(255, 255, 255, 0.65);display: block;line-height: 60px;padding-left: 24px;">
-      <i nz-icon nzType="radar-chart"></i> Oracle</div>
+      <i nz-icon nzType="radar-chart"></i> Oracle
+    </div>
     <ul nz-menu nzMode="inline">
-      <li nz-menu-item>
+      <!--<li nz-menu-item>
         <i nz-icon nzType="apartment"></i>
         <a routerLink="/map">Map</a>
-      </li>
+      </li>-->
       <li nz-menu-item>
         <i nz-icon nzType="hdd"></i>
         <a routerLink="/devices">Devices</a>
