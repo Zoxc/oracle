@@ -7,8 +7,11 @@ use crate::{
     state::Conf,
 };
 use chrono::{DateTime, Local};
-use lettre::{smtp::authentication::Credentials, SmtpClient, Transport};
+use lettre::{
+    smtp::authentication::Credentials, ClientSecurity, ClientTlsParameters, SmtpClient, Transport,
+};
 use lettre_email::{EmailBuilder, Mailbox};
+use native_tls::{Protocol, TlsConnector};
 use std::{sync::Arc, time::SystemTime};
 use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
@@ -75,7 +78,16 @@ pub fn send_email(
 
     let creds = Credentials::new(smtp.user, smtp.password);
 
-    let client = match SmtpClient::new_simple(&smtp.server) {
+    let mut tls_builder = TlsConnector::builder();
+    tls_builder.min_protocol_version(Some(Protocol::Tlsv12));
+
+    let tls_parameters =
+        ClientTlsParameters::new(smtp.server.clone(), tls_builder.build().unwrap());
+
+    let client = match SmtpClient::new(
+        (smtp.server.clone(), 587),
+        ClientSecurity::Required(tls_parameters),
+    ) {
         Ok(client) => client,
         _ => {
             log.log(Kind::Error, "Unable to create SMTP client");
@@ -90,10 +102,10 @@ pub fn send_email(
             log.note(&format!("Sent email to {}", email_receiver));
             true
         }
-        Err(_) => {
+        Err(error) => {
             log.log(
                 Kind::Error,
-                &format!("Unable to send email to {}", email_receiver),
+                &format!("Unable to send email to {}\n{}", email_receiver, error),
             );
             false
         }
@@ -122,13 +134,6 @@ pub async fn notifier(
                     }
                     _ => continue,
                 };
-
-                let desc = devices.device(device).conf.lock().desc();
-
-                match status.0 {
-                    ServiceStatus::Up => log.log(Kind::Note, &format!("Device {} is up", desc)),
-                    ServiceStatus::Down => log.log(Kind::Error, &format!("Device {} is down", desc)),
-                }
 
                 buffer.push((device, status));
 

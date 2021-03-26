@@ -229,10 +229,6 @@ pub fn webserver(devices: Arc<Devices>) -> BoxedFilter<(impl Reply,)> {
         .and(warp::path::end())
         .and(warp::body::json())
         .map(move |mut device: DeviceConf| {
-            //let ipv4 = from_map(&config, "ipv4");
-
-            println!("device: {:?}", device);
-
             device.id = devices_.new_device_id();
             devices_.add(device);
             devices_.save();

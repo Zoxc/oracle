@@ -6,7 +6,7 @@
         <div nz-col nzSpan="12" style="text-align:right"><button nz-button nzType="default" (click)="add_device()">Add
                 device</button></div>
     </div>
-    <nz-table #deviceTable [nzData]="list">
+    <nz-table #deviceTable [nzData]="list" [nzPageSize]="20">
         <thead>
             <tr>
                 <th>Name</th>

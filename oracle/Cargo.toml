@@ -18,3 +18,5 @@ tracing-subscriber = "0.2.14"
 lettre = "0.9.5"
 lettre_email = "0.9.4"
 chrono = "0.4.19"
+native-tls = "0.2.7"
+
