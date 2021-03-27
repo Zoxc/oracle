@@ -17,7 +17,7 @@ import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { NZ_I18N } from 'ng-zorro-antd/i18n';
 import { en_US } from 'ng-zorro-antd/i18n';
 import { registerLocaleData } from '@angular/common';
@@ -28,6 +28,7 @@ import { AddDeviceComponent } from './add-device/add-device.component';
 import { SinceComponent } from './since/since.component';
 import { LogComponent } from './log/log.component';
 import { LoginComponent } from './login/login.component';
+import { JwtInterceptor } from './interceptor';
 
 registerLocaleData(en);
 
@@ -60,7 +61,7 @@ registerLocaleData(en);
     ReactiveFormsModule,
     HttpClientModule
   ],
-  providers: [{ provide: NZ_I18N, useValue: en_US }],
+  providers: [{ provide: HTTP_INTERCEPTORS, useClass: JwtInterceptor, multi: true }, { provide: NZ_I18N, useValue: en_US }],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

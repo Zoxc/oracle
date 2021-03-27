@@ -34,7 +34,7 @@ pub fn send_email(
             ServiceStatus::Down => "down",
         };
         let desc = devices.device(change.0).conf.lock().desc();
-        body.push_str(&format!(" - Device `{}` went {} at {}", desc, verb, time));
+        body.push_str(&format!(" - Device `{}` went {} at {}\n", desc, verb, time));
     }
 
     let smtp = conf.lock().smtp.clone().unwrap();
@@ -148,7 +148,7 @@ pub async fn notifier(
 
             },
             Some(()) = email_signal.recv() => {
-                let result ={
+                let result = {
                     let buffer = buffer.clone();
                     let log = log.clone();
                     let conf = conf.clone();
@@ -160,6 +160,7 @@ pub async fn notifier(
 
                 if result {
                     buffer.clear();
+                    active = false;
                 } else {
                     // Try again in 5 mins
                     let mut send_email_signal = send_email_signal.clone();
@@ -169,7 +170,6 @@ pub async fn notifier(
                     });
                 }
 
-                active = false;
             },
             else => { break }
         };
