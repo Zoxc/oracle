@@ -2,9 +2,16 @@ use crate::devices::{self, Devices};
 use crate::log::{self, Log};
 use crate::state::{Config, State};
 use serde_json;
-use std::str;
 use std::sync::Arc;
-use warp::{filters::BoxedFilter, Filter, Reply};
+use std::{convert::Infallible, str};
+use warp::{
+    filters::BoxedFilter,
+    header::headers_cloned,
+    http::HeaderValue,
+    hyper::{HeaderMap, StatusCode},
+    reject::{self, Reject},
+    reply, Filter, Rejection, Reply,
+};
 
 fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
     let state_ = state.clone();
@@ -35,21 +42,47 @@ fn settings(state: &State) -> BoxedFilter<(impl Reply,)> {
     read_settings.or(write_settings).boxed()
 }
 
+#[derive(Debug)]
+struct Unauthorized;
+
+impl Reject for Unauthorized {}
+
+pub fn protected() -> impl Filter<Extract = (), Error = Rejection> + Clone {
+    headers_cloned().and_then(authorize).untuple_one()
+}
+
+async fn authorize(headers: HeaderMap<HeaderValue>) -> Result<(), Rejection> {
+    return Err(reject::custom(Unauthorized));
+}
+
+async fn api_error(err: Rejection) -> Result<impl Reply, Infallible> {
+    if err.find::<Unauthorized>().is_some() {
+        return Ok(reply::with_status(
+            warp::reply::html("Unauthorized"),
+            StatusCode::UNAUTHORIZED,
+        ));
+    }
+
+    Ok(reply::with_status(
+        warp::reply::html("Error"),
+        StatusCode::BAD_REQUEST,
+    ))
+}
+
 pub async fn webserver(devices: Arc<Devices>, state: State, log: Arc<Log>) {
     let port = state.lock().config.web_port;
 
     let files = warp::fs::dir("web");
-    let index = warp::fs::file("web/index.html");
 
-    let app = files
-        .or(index)
-        .map(|reply| warp::reply::with_header(reply, "Cache-Control", "no-cache"));
+    let app = files.map(|reply| warp::reply::with_header(reply, "Cache-Control", "no-cache"));
 
     let log = warp::path!("log").and(log::websocket(log));
 
-    let api = settings(&state).or(devices::webserver(devices)).or(log);
+    let protected_api = settings(&state).or(devices::webserver(devices)).or(log);
 
-    let api = warp::path("api").and(api);
+    let protected_api = protected().and(protected_api);
+
+    let api = warp::path("api").and(protected_api.recover(api_error));
 
     warp::serve(api.or(app)).run(([127, 0, 0, 1], port)).await;
 }

@@ -20,10 +20,17 @@ pub struct Config {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct User {
+    pub name: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Configuration {
     #[serde(flatten)]
     pub config: Config,
     pub smtp: Option<Smtp>,
+    pub users: Vec<User>,
 }
 
 impl Configuration {
