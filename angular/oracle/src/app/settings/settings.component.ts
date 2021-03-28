@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators, ValidatorFn } from '@angular/forms';
 
@@ -28,15 +29,14 @@ export class SettingsComponent implements OnInit {
     "web_port": new FormControl(null, tcp_port_validator),
     "ping_interval": new FormControl(null, tcp_port_validator)
   });
-  constructor() { }
+  constructor(private http: HttpClient) { }
 
   ngOnInit(): void {
-    fetch("/api/settings").then(response => response.json())
-      .then(data => {
-        this.initial = data;
-        this.form.setValue(data);
-        this.loaded = true;
-      });
+    this.http.get("/api/settings").subscribe(data => {
+      this.initial = data;
+      this.form.setValue(data);
+      this.loaded = true;
+    });
   }
 
   apply() {
@@ -44,11 +44,6 @@ export class SettingsComponent implements OnInit {
     data.web_port = parseInt(data.web_port);
     data.ping_interval = parseInt(data.ping_interval);
     this.form.reset(data);
-    fetch("/api/settings", {
-      method: "POST", body: JSON.stringify(data), headers: {
-        "Content-Type": "application/json"
-      },
-    }).then(response => {
-    })
+    this.http.post("/api/settings", data).subscribe(_dummy => { })
   }
 }

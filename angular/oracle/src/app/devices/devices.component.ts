@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewContainerRef } from '@angular/core';
 import { AddDeviceComponent } from './../add-device/add-device.component';
 import { NzModalRef, NzModalService } from 'ng-zorro-antd/modal';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-devices',
@@ -27,7 +28,8 @@ export class DevicesComponent implements OnInit {
     return status || { status: "Unknown", since: this.start }
   }
 
-  constructor(private modal: NzModalService, private viewContainerRef: ViewContainerRef) { }
+  constructor(private modal: NzModalService, private viewContainerRef: ViewContainerRef,
+    private http: HttpClient) { }
 
   add_device(): void {
     const modal = this.modal.create({
@@ -61,10 +63,9 @@ export class DevicesComponent implements OnInit {
   }
 
   update(): void {
-    fetch("/api/devices").then(response => response.json())
-      .then(data => {
-        this.list = data;
-      })
+    this.http.get("/api/devices").subscribe(data => {
+      this.list = data as any;
+    })
   }
 
   ngOnInit(): void {

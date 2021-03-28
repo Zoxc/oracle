@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
@@ -10,14 +11,16 @@ export class LogComponent implements OnInit {
   loaded = false
   ws: WebSocket
 
-  constructor() { }
+  constructor(private http: HttpClient) { }
 
   ngOnInit(): void {
+    // Dummy request to log us out if needed
+    this.http.get("/api/dummy").subscribe(_dummy => { });
+
     this.ws = new WebSocket(`ws://${window.location.host}/api/log`)
     this.ws.onmessage = event => {
       let events = JSON.parse(event.data);
       for (let event of events) {
-        console.log(event)
         this.log = [event].concat(this.log);
       }
 

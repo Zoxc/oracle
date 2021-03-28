@@ -19,7 +19,7 @@ pub struct Config {
     pub ping_interval: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct User {
     pub name: String,
     pub password: String,
