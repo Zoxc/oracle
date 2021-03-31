@@ -12,7 +12,10 @@ use lettre::{
 };
 use lettre_email::{EmailBuilder, Mailbox};
 use native_tls::{Protocol, TlsConnector};
-use std::{sync::Arc, time::SystemTime};
+use std::{
+    sync::Arc,
+    time::{Instant, SystemTime},
+};
 use tokio::sync::mpsc;
 use tokio::time::{delay_for, Duration};
 use tokio::{spawn, task};
@@ -112,6 +115,35 @@ pub fn send_email(
     }
 }
 
+pub async fn generate_email_signal(
+    devices: Arc<Devices>,
+    mut send_email_signal: mpsc::Sender<()>,
+    secs: u64,
+) {
+    delay_for(Duration::from_secs(secs)).await;
+
+    // Acquire the token to send emails
+    loop {
+        {
+            let mut lock = devices.last_email.lock();
+
+            match *lock {
+                Some(last) => {
+                    if Instant::now().saturating_duration_since(last).as_secs() > 30 {
+                        *lock = None;
+                        break;
+                    }
+                }
+                None => (),
+            }
+        };
+
+        delay_for(Duration::from_secs(35)).await;
+    }
+
+    send_email_signal.send(()).await.unwrap();
+}
+
 pub async fn notifier(
     conf: Conf,
     devices: Arc<Devices>,
@@ -139,13 +171,8 @@ pub async fn notifier(
 
                 if !active {
                     active = true;
-                    let mut send_email_signal = send_email_signal.clone();
-                    spawn(async move {
-                        delay_for(Duration::from_secs(30)).await;
-                        send_email_signal.send(()).await.unwrap();
-                    });
+                    spawn(generate_email_signal(devices.clone(), send_email_signal.clone(), 30));
                 }
-
             },
             Some(()) = email_signal.recv() => {
                 let result = {
@@ -156,18 +183,18 @@ pub async fn notifier(
                     let email_receiver = email_receiver.clone();
 
                     task::spawn_blocking(move || send_email(&devices, &log, &conf, &email_receiver, buffer)).await.unwrap()
+
                 };
+
+                // Return email token
+                *devices.last_email.lock() = Some(Instant::now());
 
                 if result {
                     buffer.clear();
                     active = false;
                 } else {
                     // Try again in 5 mins
-                    let mut send_email_signal = send_email_signal.clone();
-                    spawn(async move {
-                        delay_for(Duration::from_secs(300)).await;
-                        send_email_signal.send(()).await.unwrap();
-                    });
+                    spawn(generate_email_signal(devices.clone(), send_email_signal.clone(), 300));
                 }
 
             },

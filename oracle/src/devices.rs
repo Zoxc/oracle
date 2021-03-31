@@ -8,10 +8,10 @@ use futures::{SinkExt, StreamExt};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, json};
-use std::fs;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::time::SystemTime;
+use std::{fs, time::Instant};
 use tokio::{
     spawn,
     sync::{broadcast, mpsc},
@@ -89,6 +89,7 @@ pub enum DeviceChange {
 pub struct Devices {
     pub list: Mutex<Vec<Arc<Device>>>,
     pub changes: broadcast::Sender<DeviceChange>,
+    pub last_email: Mutex<Option<Instant>>,
     pub notifiers: Mutex<Vec<mpsc::Sender<DeviceChange>>>,
     pub conf: Conf,
     pub ping: Ping,
@@ -323,6 +324,7 @@ pub fn load(conf: Conf, log: Arc<Log>) -> Arc<Devices> {
         conf: conf.clone(),
         ping,
         log: log.clone(),
+        last_email: Mutex::new(Some(Instant::now())),
         notifiers: Mutex::new(Vec::new()),
     });
 
