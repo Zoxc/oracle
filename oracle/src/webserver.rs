@@ -126,8 +126,11 @@ pub async fn webserver(devices: Arc<Devices>, state: State, log: Arc<Log>) {
     let port = state.lock().config.web_port;
 
     let files = warp::fs::dir("web");
+    let index = warp::fs::file("web/index.html");
 
-    let app = files.map(|reply| warp::reply::with_header(reply, "Cache-Control", "no-cache"));
+    let app = files
+        .or(index)
+        .map(|reply| warp::reply::with_header(reply, "Cache-Control", "no-cache"));
 
     let log = warp::path!("log").and(log::websocket(log));
 
