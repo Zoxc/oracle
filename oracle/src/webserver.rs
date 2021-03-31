@@ -157,5 +157,5 @@ pub async fn webserver(devices: Arc<Devices>, state: State, log: Arc<Log>) {
 
     let api = warp::path("api").and(api.recover(api_error));
 
-    warp::serve(api.or(app)).run(([127, 0, 0, 1], port)).await;
+    warp::serve(api.or(app)).run(([0, 0, 0, 0], port)).await;
 }
