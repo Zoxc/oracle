@@ -1,14 +1,14 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use rand;
 use socket2::{Domain, Protocol, Socket, Type};
-use std::collections::HashMap;
 use std::io::Cursor;
 use std::io::{Seek, SeekFrom};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::net::{SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
+use std::{collections::HashMap, time::Instant};
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
 
@@ -46,7 +46,7 @@ async fn ping_task(mut ping_requests: mpsc::Receiver<(Ipv4Addr, oneshot::Sender<
         let mut buffer = [0; 1500];
         loop {
             if let Ok((size, src)) = socket_.recv_from(&mut buffer) {
-                let time = SystemTime::now();
+                let time = Instant::now();
                 src.as_inet().map(|sa| {
                     parse_ping_v4(&buffer[0..size]).map(|(id, seq)| {
                         handle
@@ -73,12 +73,14 @@ async fn ping_task(mut ping_requests: mpsc::Receiver<(Ipv4Addr, oneshot::Sender<
     let mut seq = rand::random();
     let id = rand::random();
 
-    let mut map: HashMap<u16, (Ipv4Addr, SystemTime, oneshot::Sender<Duration>)> = HashMap::new();
+    let mut map: HashMap<u16, (Ipv4Addr, Instant, oneshot::Sender<Duration>)> = HashMap::new();
+
+    let mut cleanup = tokio::time::interval(Duration::from_secs(600));
 
     loop {
         tokio::select! {
             Some((ip, reply)) = ping_requests.recv() => {
-                map.insert(seq, (ip, SystemTime::now(), reply));
+                map.insert(seq, (ip, Instant::now(), reply));
                 ping_sender.send((ip, id, seq)).await.unwrap();
                 seq = seq.wrapping_add(1);
             },
@@ -86,11 +88,18 @@ async fn ping_task(mut ping_requests: mpsc::Receiver<(Ipv4Addr, oneshot::Sender<
                 if id == reply_id {
                     map.remove(&seq).map(|(ip, start, reply)| {
                         if ip == from {
-                            let duration = time.duration_since(start).unwrap_or(Duration::from_secs(0));
+                            let duration = time.saturating_duration_since(start);
                             reply.send(duration).ok();
                         }
                     });
                 }
+            },
+            _ = cleanup.tick() => {
+                // Clean up pings that didn't get answers
+                let now = Instant::now();
+                map.retain(|_, value| {
+                    now.saturating_duration_since(value.1).as_secs() < 600
+                });
             },
             else => { break }
         };
@@ -116,7 +125,8 @@ pub fn send_ping_v4(socket: &Socket, buffer: &mut [u8], ip: Ipv4Addr, id: u16, s
 
     write_checksum(buffer, &mut 0);
 
-    socket.send_to(buffer, &addr.into()).unwrap();
+    // FIXME: Can fail without a network connection (and likely invalid IP too)
+    socket.send_to(buffer, &addr.into()).ok();
 }
 
 pub fn parse_ping_v4(packet: &[u8]) -> Option<(u16, u16)> {
